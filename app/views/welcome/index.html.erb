@@ -1,2 +1,10 @@
-<h1>Welcome#index</h1>
-<p>Find me in app/views/welcome/index.html.erb</p>
+<h1>Nelson Blaha</h1>
+<div id="links">
+	<h2>Links</h2>
+	<% Link.all.each do |l| %>
+		<div class="link">
+			<b><%= link_to l.title, l.url %></b><br>
+			<i><%= l.description %></i>
+		</div>
+	<% end %>
+</div>
