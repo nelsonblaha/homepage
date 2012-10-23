@@ -1,10 +1,13 @@
 <h1>Nelson Blaha</h1>
-<div id="links">
-	<h2>Links</h2>
-	<% Link.all.each do |l| %>
-		<div class="link">
-			<b><%= link_to l.title, l.url %></b><br>
-			<i><%= l.description %></i>
-		</div>
-	<% end %>
-</div>
+
+<% Tag.all.each do |tag| %>
+	<div class="tag">
+		<h2><%= tag.name %></h2>
+		<% tag.links.each do |l| %>
+			<div class="link">
+				<b><%= link_to l.title, l.url %></b><br>
+				<i><%= l.description %></i>
+			</div>
+		<% end %>
+	</div>
+<% end %>
