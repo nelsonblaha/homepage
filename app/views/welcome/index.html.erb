@@ -7,7 +7,42 @@
 			<div class="link">
 				<b><%= link_to l.title, l.url %></b><br>
 				<i><%= l.description %></i>
+				<% if current_user && current_user.admin %>
+					<%= form_tag("/new_tagging_for_link") do %>
+						<p>
+							<%= text_field_tag(:tag_name) %>
+							<%= hidden_field_tag(:id,l.id) %>
+							<%= submit_tag "add tag to link" %>
+						</p>
+					<% end %>
+				<% end %>	
 			</div>
 		<% end %>
+	</div>
+<% end %>
+	
+<% if @loose_links.count > 0 %>
+	<h2>Untagged Links</h2>
+	<% @loose_links.each do |l| %>
+		<div class="link">
+			<b><%= link_to l.title, l.url %></b><br>
+			<i><%= l.description %></i>
+			<% if current_user && current_user.admin %>
+				<%= form_tag("/new_tagging_for_link") do %>
+					<p>
+						<%= text_field_tag(:tag_name) %>
+						<%= hidden_field_tag(:id,l.id) %>
+						<%= submit_tag "add tag to link" %>
+					</p>
+				<% end %>
+			<% end %>		
+		</div>
+	<% end %>
+<% end %>
+
+<% if current_user && current_user.admin %>
+	<div id="admin">
+		<p>Admin</p>
+		<p><%= link_to "Add Link", new_link_path %></p>
 	</div>
 <% end %>
