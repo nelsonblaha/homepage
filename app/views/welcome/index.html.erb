@@ -15,6 +15,7 @@
 							<%= submit_tag "add tag to link" %>
 						</p>
 					<% end %>
+					<%= link_to "edit", edit_link_path(l) %>
 				<% end %>	
 			</div>
 		<% end %>
@@ -35,6 +36,7 @@
 						<%= submit_tag "add tag to link" %>
 					</p>
 				<% end %>
+				<%= link_to "edit", edit_link_path(l) %>
 			<% end %>		
 		</div>
 	<% end %>

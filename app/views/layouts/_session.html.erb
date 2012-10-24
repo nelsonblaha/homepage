@@ -3,3 +3,7 @@
 <% else %>
 	<p><%= link_to "sign in", new_user_session_path %> or <%= link_to "register", new_user_registration_path %></p>
 <% end %>
+
+<% unless User.where(admin:true).count > 0 %>
+	<p>Register, then enter the console and mark your user as admin=true and approved=true</p>
+<% end %>
