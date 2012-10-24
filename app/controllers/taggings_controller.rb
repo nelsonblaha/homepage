@@ -1,5 +1,7 @@
 class TaggingsController < ApplicationController
   
+  before_filter :authenticate_user!, except: :show
+
   # scaffolding methods
 
     def index
