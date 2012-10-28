@@ -5,6 +5,7 @@
 		<h2><%= tag.name %></h2>
 		<% tag.links.each do |l| %>
 			<div class="link">
+				<%= image_tag l.icon %>
 				<b><%= link_to l.title, l.url %></b><br>
 				<i><%= l.description %></i>
 				<% if current_user && current_user.admin %>
@@ -26,6 +27,7 @@
 	<h2>Untagged Links</h2>
 	<% @loose_links.each do |l| %>
 		<div class="link">
+			<%= image_tag l.icon %>
 			<b><%= link_to l.title, l.url %></b><br>
 			<i><%= l.description %></i>
 			<% if current_user && current_user.admin %>
