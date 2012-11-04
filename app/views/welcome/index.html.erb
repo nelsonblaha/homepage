@@ -1,11 +1,14 @@
-<h1>Nelson Blaha</h1>
+<div id="name">
+	<h1>Nelson Blaha</h1>
+	<h3>Programmer</h3>
+</div>
 
 <% Tag.all.each do |tag| %>
 	<div class="tag">
 		<h2><%= tag.name %></h2>
 		<% tag.links.each do |l| %>
 			<div class="link">
-				<%= image_tag l.icon, size:"32x32" %>
+<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
 				<b><%= link_to l.title, l.url %></b><br>
 				<i><%= l.description %></i>
 				<% if current_user && current_user.admin %>
@@ -24,24 +27,26 @@
 <% end %>
 	
 <% if @loose_links.count > 0 %>
-	<h2>Untagged Links</h2>
-	<% @loose_links.each do |l| %>
-		<div class="link">
-			<%= image_tag l.icon, size:"32x32" %>
-			<b><%= link_to l.title, l.url %></b><br>
-			<i><%= l.description %></i>
-			<% if current_user && current_user.admin %>
-				<%= form_tag("/new_tagging_for_link") do %>
-					<p>
-						<%= text_field_tag(:tag_name) %>
-						<%= hidden_field_tag(:id,l.id) %>
-						<%= submit_tag "add tag to link" %>
-					</p>
-				<% end %>
-				<%= link_to "edit", edit_link_path(l) %>
-			<% end %>		
-		</div>
-	<% end %>
+	<div class="tag">
+		<h2>Untagged Links</h2>
+		<% @loose_links.each do |l| %>
+			<div class="link">
+<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
+				<b><%= link_to l.title, l.url %></b><br>
+				<i><%= l.description %></i>
+				<% if current_user && current_user.admin %>
+					<%= form_tag("/new_tagging_for_link") do %>
+						<p>
+							<%= text_field_tag(:tag_name) %>
+							<%= hidden_field_tag(:id,l.id) %>
+							<%= submit_tag "add tag to link" %>
+						</p>
+					<% end %>
+					<%= link_to "edit", edit_link_path(l) %>
+				<% end %>		
+			</div>
+		<% end %>
+	</div>
 <% end %>
 
 <% if current_user && current_user.admin %>
