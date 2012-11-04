@@ -3,51 +3,53 @@
 	<h3>Programmer</h3>
 </div>
 
-<% Tag.all.each do |tag| %>
-	<div class="tag">
-		<h2><%= tag.name %></h2>
-		<% tag.links.each do |l| %>
-			<div class="link">
-<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
-				<b><%= link_to l.title, l.url %></b><br>
-				<i><%= l.description %></i>
-				<% if current_user && current_user.admin %>
-					<%= form_tag("/new_tagging_for_link") do %>
-						<p>
-							<%= text_field_tag(:tag_name) %>
-							<%= hidden_field_tag(:id,l.id) %>
-							<%= submit_tag "add tag to link" %>
-						</p>
-					<% end %>
-					<%= link_to "edit", edit_link_path(l) %>
-				<% end %>	
-			</div>
-		<% end %>
-	</div>
-<% end %>
-	
-<% if @loose_links.count > 0 %>
-	<div class="tag">
-		<h2>Untagged Links</h2>
-		<% @loose_links.each do |l| %>
-			<div class="link">
-<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
-				<b><%= link_to l.title, l.url %></b><br>
-				<i><%= l.description %></i>
-				<% if current_user && current_user.admin %>
-					<%= form_tag("/new_tagging_for_link") do %>
-						<p>
-							<%= text_field_tag(:tag_name) %>
-							<%= hidden_field_tag(:id,l.id) %>
-							<%= submit_tag "add tag to link" %>
-						</p>
-					<% end %>
-					<%= link_to "edit", edit_link_path(l) %>
-				<% end %>		
-			</div>
-		<% end %>
-	</div>
-<% end %>
+<div id="tags">
+	<% Tag.all.each do |tag| %>
+		<div class="tag">
+			<h2 class="tag_name"><%= tag.name %></h2>
+			<% tag.links.each do |l| %>
+				<div class="link">
+	<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
+					<b><%= link_to l.title, l.url %></b><br>
+					<i><%= l.description %></i>
+					<% if current_user && current_user.admin %>
+						<%= form_tag("/new_tagging_for_link") do %>
+							<p>
+								<%= text_field_tag(:tag_name) %>
+								<%= hidden_field_tag(:id,l.id) %>
+								<%= submit_tag "add tag to link" %>
+							</p>
+						<% end %>
+						<%= link_to "edit", edit_link_path(l) %>
+					<% end %>	
+				</div>
+			<% end %>
+		</div>
+	<% end %>
+		
+	<% if @loose_links.count > 0 %>
+		<div class="tag">
+			<h2>Untagged Links</h2>
+			<% @loose_links.each do |l| %>
+				<div class="link">
+	<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
+					<b><%= link_to l.title, l.url %></b><br>
+					<i><%= l.description %></i>
+					<% if current_user && current_user.admin %>
+						<%= form_tag("/new_tagging_for_link") do %>
+							<p>
+								<%= text_field_tag(:tag_name) %>
+								<%= hidden_field_tag(:id,l.id) %>
+								<%= submit_tag "add tag to link" %>
+							</p>
+						<% end %>
+						<%= link_to "edit", edit_link_path(l) %>
+					<% end %>		
+				</div>
+			<% end %>
+		</div>
+	<% end %>
+</div>
 
 <% if current_user && current_user.admin %>
 	<div id="admin">
