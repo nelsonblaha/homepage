@@ -7,6 +7,9 @@
 	<% Tag.all.each do |tag| %>
 		<div class="tag">
 			<h2 class="tag_name"><%= tag.name %></h2>
+			<% if current_user && current_user.admin %>
+				<%= link_to "edit tag", edit_tag_path(tag) %>
+			<% end %>
 			<% tag.links.each do |l| %>
 				<div class="link">
 	<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
