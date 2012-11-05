@@ -13,7 +13,7 @@
 			<% tag.links.each do |l| %>
 				<div class="link">
 	<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
-					<b><%= link_to l.title, l.url %></b><br>
+					<b><%= link_to l.title, l.url, target:"_blank" %></b><br>
 					<i><%= l.description %></i>
 					<% if current_user && current_user.admin %>
 						<%= form_tag("/new_tagging_for_link") do %>
@@ -36,7 +36,7 @@
 			<% @loose_links.each do |l| %>
 				<div class="link">
 	<!-- 				<%= image_tag l.icon, size:"32x32" %> -->
-					<b><%= link_to l.title, l.url %></b><br>
+					<b><%= link_to l.title, l.url, target: "_blank" %></b><br>
 					<i><%= l.description %></i>
 					<% if current_user && current_user.admin %>
 						<%= form_tag("/new_tagging_for_link") do %>
