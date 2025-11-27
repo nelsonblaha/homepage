@@ -1302,26 +1302,31 @@
                         }
                     });
 
-                    // Convert to array, only showing header for stacks with 2+ services
+                    // Convert to array with specific order: social, media, other, infra
                     const result = [];
+                    const stackOrder = ['social', 'media']; // other and infra handled specially
 
-                    // Sort stacks: alphabetically but exclude 'infra' (added at very end)
-                    const sortedStacks = Object.keys(groups)
-                        .filter(s => s !== 'infra')
-                        .sort();
-
-                    // Add stacks with 2+ services (with headers)
-                    sortedStacks.forEach(stack => {
-                        if (groups[stack].length >= 2) {
+                    // Add stacks in order (if 2+ services)
+                    stackOrder.forEach(stack => {
+                        if (groups[stack] && groups[stack].length >= 2) {
                             result.push({ stack, services: groups[stack] });
                         }
                     });
 
-                    // Combine single-item stacks (except infra) and no-stack items into ungrouped "Other"
+                    // Combine single-item stacks and no-stack items into ungrouped "Other"
                     const ungrouped = [...noStack];
                     Object.keys(groups).forEach(stack => {
-                        if (stack !== 'infra' && groups[stack].length < 2) {
+                        if (!stackOrder.includes(stack) && stack !== 'infra' && groups[stack].length < 2) {
                             ungrouped.push(...groups[stack]);
+                        } else if (stackOrder.includes(stack) && groups[stack].length < 2) {
+                            ungrouped.push(...groups[stack]);
+                        }
+                    });
+
+                    // Add any other stacks not in stackOrder (except infra)
+                    Object.keys(groups).forEach(stack => {
+                        if (!stackOrder.includes(stack) && stack !== 'infra' && groups[stack].length >= 2) {
+                            result.push({ stack, services: groups[stack] });
                         }
                     });
 
