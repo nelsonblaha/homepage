@@ -779,9 +779,9 @@
                         }
                     }
 
-                    // Start Jitsi participant polling
+                    // Start Jitsi participant polling (every 5 seconds for live updates)
                     this.fetchJitsiParticipants();
-                    setInterval(() => this.fetchJitsiParticipants(), 30000);
+                    setInterval(() => this.fetchJitsiParticipants(), 5000);
                 },
 
                 async fetchJitsiParticipants() {
