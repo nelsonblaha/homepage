@@ -90,7 +90,7 @@ jobs:
           SESSION_SECRET: testsecret1234567890abcdef
           DB_PATH: /tmp/test-integration.db
           COOKIE_DOMAIN: localhost
-          OMBI_URL: http://localhost:3579
+          OMBI_URL: http://localhost:3580
           OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
         run: |
           pip install -r requirements.txt
@@ -112,7 +112,7 @@ jobs:
         env:
           CYPRESS_BASE_URL: http://localhost:8100
           CYPRESS_ADMIN_PASSWORD: testpassword
-          CYPRESS_OMBI_URL: http://localhost:3579
+          CYPRESS_OMBI_URL: http://localhost:3580
           CYPRESS_OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
 
       - name: Cleanup

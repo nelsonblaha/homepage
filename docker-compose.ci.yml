@@ -34,7 +34,7 @@ services:
       - PGID=1000
       - TZ=America/Chicago
     ports:
-      - "3579:3579"
+      - "3580:3579"  # Use 3580 to avoid conflict with production Ombi
     volumes:
       - ombi-config:/config
     healthcheck:
