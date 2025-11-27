@@ -1,6 +1,7 @@
 """Nextcloud integration for blaha.io"""
 import os
 import secrets
+import ssl
 import httpx
 from fastapi import APIRouter, Depends
 
@@ -9,6 +10,11 @@ from services.session import verify_admin
 NEXTCLOUD_URL = os.environ.get("NEXTCLOUD_URL", "")
 NEXTCLOUD_ADMIN_USER = os.environ.get("NEXTCLOUD_ADMIN_USER", "admin")
 NEXTCLOUD_ADMIN_PASS = os.environ.get("NEXTCLOUD_ADMIN_PASS", "")
+
+# Skip SSL verification for self-signed certs
+SSL_CONTEXT = ssl.create_default_context()
+SSL_CONTEXT.check_hostname = False
+SSL_CONTEXT.verify_mode = ssl.CERT_NONE
 
 router = APIRouter(prefix="/api/nextcloud", tags=["nextcloud"])
 
@@ -19,7 +25,7 @@ async def create_nextcloud_user(username: str) -> dict | None:
         return None
     try:
         password = secrets.token_urlsafe(16)
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             # OCS API for user creation
             resp = await client.post(
                 f"{NEXTCLOUD_URL}/ocs/v1.php/cloud/users",
@@ -58,7 +64,7 @@ async def delete_nextcloud_user(user_id: str) -> bool:
     if not NEXTCLOUD_URL or not NEXTCLOUD_ADMIN_PASS:
         return False
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             resp = await client.delete(
                 f"{NEXTCLOUD_URL}/ocs/v1.php/cloud/users/{user_id}",
                 auth=(NEXTCLOUD_ADMIN_USER, NEXTCLOUD_ADMIN_PASS),
@@ -80,7 +86,7 @@ async def authenticate_nextcloud(username: str, password: str) -> dict | None:
     if not NEXTCLOUD_URL:
         return None
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             # Verify credentials work by hitting capabilities endpoint
             resp = await client.get(
                 f"{NEXTCLOUD_URL}/ocs/v1.php/cloud/capabilities",
@@ -154,7 +160,7 @@ async def nextcloud_status(_: bool = Depends(verify_admin)):
     if not NEXTCLOUD_URL or not NEXTCLOUD_ADMIN_PASS:
         return {"connected": False, "error": "Not configured"}
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=False) as client:
             resp = await client.get(
                 f"{NEXTCLOUD_URL}/ocs/v1.php/cloud/capabilities",
                 auth=(NEXTCLOUD_ADMIN_USER, NEXTCLOUD_ADMIN_PASS),

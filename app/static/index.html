@@ -12,6 +12,16 @@
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
     <div x-data="app()" x-init="init()" x-cloak>
+        <!-- Toast Notification -->
+        <div x-show="toast.show" x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform translate-y-2"
+             x-transition:enter-end="opacity-100 transform translate-y-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform translate-y-0"
+             x-transition:leave-end="opacity-0 transform translate-y-2"
+             class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2">
+            <span x-text="toast.message"></span>
+        </div>
         <!-- PUBLIC LANDING -->
         <template x-if="view === 'public'">
             <div class="flex flex-col items-center justify-center min-h-screen px-4">
@@ -53,23 +63,33 @@
                     <span x-text="friendError"></span>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="services-grid">
-                    <template x-for="service in friendServices" :key="service.id">
-                        <div @click="handleServiceClick(service)"
-                             class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative cursor-pointer">
-                            <!-- Auth indicator -->
-                            <span x-show="isAutoAuth(service)"
-                                  class="absolute top-2 right-2 text-green-400 text-sm" title="auto-login">↗</span>
-                            <span x-show="needsManualLogin(service)"
-                                  class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
-                            <span x-show="!isAutoAuth(service) && !needsManualLogin(service)"
-                                  class="absolute top-2 right-2 text-gray-400 text-sm" title="external account">🔒</span>
-                            <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
-                            <div class="font-semibold" x-text="service.name"></div>
-                            <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
+                <!-- Grouped by stack -->
+                <template x-for="group in getGroupedServices(friendServices)" :key="group.stack">
+                    <div class="mb-8">
+                        <!-- Stack header (only for stacks with 2+ services) -->
+                        <div x-show="group.services.length >= 2 && group.stack" class="flex items-center gap-2 mb-3">
+                            <span class="text-2xl" x-text="getStackIcon(group.stack)"></span>
+                            <span class="text-lg font-semibold text-gray-400" x-text="getStackLabel(group.stack)"></span>
                         </div>
-                    </template>
-                </div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="services-grid">
+                            <template x-for="service in group.services" :key="service.id">
+                                <div @click="handleServiceClick(service)"
+                                     class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative cursor-pointer">
+                                    <!-- Auth indicator -->
+                                    <span x-show="isAutoAuth(service)"
+                                          class="absolute top-2 right-2 text-green-400 text-sm" title="auto-login">↗</span>
+                                    <span x-show="needsManualLogin(service)"
+                                          class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
+                                    <span x-show="!isAutoAuth(service) && !needsManualLogin(service)"
+                                          class="absolute top-2 right-2 text-gray-400 text-sm" title="external account">🔒</span>
+                                    <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
+                                    <div class="font-semibold" x-text="service.name"></div>
+                                    <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
 
                 <!-- Credentials Modal -->
                 <div x-show="showCredentials" x-cloak
@@ -105,7 +125,7 @@
                             <a :href="getDirectServiceUrl(credentialsService)"
                                target="_blank"
                                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded text-center transition-colors">
-                                Go to <span x-text="credentialsService?.name"></span>
+                                Go to <span x-text="credentialsService?.name"></span> in new tab
                             </a>
                             <button @click="showCredentials = false"
                                     class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors">
@@ -217,17 +237,27 @@
                     <p class="text-xl text-gray-300">All Services</p>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    <template x-for="service in services" :key="service.id">
-                        <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
-                           target="_blank"
-                           class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative">
-                            <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
-                            <div class="font-semibold" x-text="service.name"></div>
-                            <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
-                        </a>
-                    </template>
-                </div>
+                <!-- Grouped by stack -->
+                <template x-for="group in getGroupedServices(services)" :key="group.stack">
+                    <div class="mb-8">
+                        <!-- Stack header (only for stacks with 2+ services) -->
+                        <div x-show="group.services.length >= 2 && group.stack" class="flex items-center gap-2 mb-3">
+                            <span class="text-2xl" x-text="getStackIcon(group.stack)"></span>
+                            <span class="text-lg font-semibold text-gray-400" x-text="getStackLabel(group.stack)"></span>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            <template x-for="service in group.services" :key="service.id">
+                                <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
+                                   target="_blank"
+                                   class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative">
+                                    <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
+                                    <div class="font-semibold" x-text="service.name"></div>
+                                    <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
+                                </a>
+                            </template>
+                        </div>
+                    </div>
+                </template>
             </div>
         </template>
 
@@ -331,51 +361,69 @@
                     </div>
 
                     <!-- Friends List -->
-                    <div class="space-y-4">
+                    <div class="space-y-3">
                         <template x-for="friend in friends" :key="friend.id">
-                            <div class="bg-gray-800 rounded-lg p-6">
-                                <div class="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h4 class="text-xl font-semibold" x-text="friend.name"></h4>
-                                        <div class="flex items-center gap-2 mt-1">
-                                            <a :href="'/f/' + friend.token" data-testid="friend-link"
-                                               class="text-sm text-gray-400 bg-gray-700 px-2 py-1 rounded hover:text-blue-300"
-                                               x-text="'blaha.io/f/' + friend.token"></a>
-                                            <button @click="copyUrl(friend.token)"
-                                                    class="text-blue-400 hover:text-blue-300 text-sm">Copy</button>
-                                        </div>
-                                        <div x-show="friend.last_visit" class="text-xs text-gray-500 mt-1">
-                                            Last visit: <span x-text="formatDate(friend.last_visit)"></span>
-                                        </div>
-                                        <!-- Account Status -->
-                                        <div class="flex items-center gap-3 mt-2 text-xs">
-                                            <span x-show="friend.plex_user_id" class="text-green-400 flex items-center gap-1">
-                                                📺 Plex
-                                                <span x-show="friend.plex_pin" class="text-gray-500">(PIN: <span x-text="friend.plex_pin"></span>)</span>
-                                            </span>
-                                            <span x-show="friend.ombi_user_id" class="text-green-400">🎬 Ombi</span>
-                                            <span x-show="friend.jellyfin_user_id" class="text-green-400">🎞️ Jellyfin</span>
-                                            <span x-show="friend.nextcloud_user_id" class="text-green-400">☁️ Nextcloud</span>
-                                        </div>
+                            <div class="bg-gray-800 rounded-lg overflow-hidden">
+                                <!-- Collapsible Header -->
+                                <button @click="expandedFriends[friend.id] = !expandedFriends[friend.id]"
+                                        class="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-750 transition-colors">
+                                    <div class="flex items-center gap-3">
+                                        <span x-text="expandedFriends[friend.id] ? '▼' : '▶'" class="text-gray-400 text-sm"></span>
+                                        <h4 class="text-lg font-semibold" x-text="friend.name"></h4>
+                                        <span x-show="friend.last_visit" class="text-sm text-gray-500">
+                                            <span x-text="formatDate(friend.last_visit)"></span>
+                                            <span class="text-gray-600">(<span x-text="timeAgo(friend.last_visit)"></span>)</span>
+                                        </span>
+                                        <span x-show="!friend.last_visit" class="text-sm text-gray-600">Never visited</span>
                                     </div>
-                                    <button @click="deleteFriend(friend.id)"
-                                            class="text-red-400 hover:text-red-300 text-sm">Delete</button>
-                                </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs text-gray-500" x-text="friend.services.length + ' services'"></span>
+                                    </div>
+                                </button>
 
-                                <div class="border-t border-gray-700 pt-4">
-                                    <p class="text-sm text-gray-400 mb-2">Services:</p>
-                                    <div class="flex flex-wrap gap-2">
-                                        <template x-for="service in services" :key="service.id">
-                                            <button @click="toggleService(friend, service)"
-                                                    :class="hasService(friend, service.id) ? getStackActiveClass(service.stack) : 'bg-gray-700 text-gray-400'"
-                                                    class="px-3 py-1 rounded text-sm hover:opacity-80 transition-opacity flex items-center gap-1">
-                                                <span x-text="service.icon" class="text-sm"></span>
-                                                <span x-text="service.name"></span>
-                                                <span x-show="isAutoAuth(service)" class="text-green-300 text-xs" title="auto-login">↗</span>
-                                                <span x-show="!isAutoAuth(service)" class="text-yellow-300 text-xs" title="account needed">🔒</span>
-                                            </button>
-                                        </template>
+                                <!-- Expanded Content -->
+                                <div x-show="expandedFriends[friend.id]" x-transition:enter="transition ease-out duration-200"
+                                     x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                     class="px-4 pb-4 border-t border-gray-700">
+                                    <div class="flex justify-between items-start pt-3 mb-3">
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <a :href="'/f/' + friend.token" data-testid="friend-link"
+                                                   class="text-sm text-gray-400 bg-gray-700 px-2 py-1 rounded hover:text-blue-300"
+                                                   x-text="'blaha.io/f/' + friend.token"></a>
+                                                <button @click.stop="copyUrl(friend.token)"
+                                                        class="text-blue-400 hover:text-blue-300 text-sm">Copy</button>
+                                            </div>
+                                            <!-- Account Status -->
+                                            <div class="flex items-center gap-3 mt-2 text-xs">
+                                                <span x-show="friend.plex_user_id" class="text-green-400 flex items-center gap-1">
+                                                    📺 Plex
+                                                    <span x-show="friend.plex_pin" class="text-gray-500">(PIN: <span x-text="friend.plex_pin"></span>)</span>
+                                                </span>
+                                                <span x-show="friend.ombi_user_id" class="text-green-400">🎬 Ombi</span>
+                                                <span x-show="friend.jellyfin_user_id" class="text-green-400">🎞️ Jellyfin</span>
+                                                <span x-show="friend.nextcloud_user_id" class="text-green-400">☁️ Nextcloud</span>
+                                            </div>
+                                        </div>
+                                        <button @click.stop="deleteFriend(friend.id)"
+                                                class="text-red-400 hover:text-red-300 text-sm">Delete</button>
                                     </div>
+
+                                    <div class="border-t border-gray-700 pt-3">
+                                        <p class="text-sm text-gray-400 mb-2">Services:</p>
+                                        <div class="flex flex-wrap gap-2">
+                                            <template x-for="service in services" :key="service.id">
+                                                <button @click.stop="toggleService(friend, service)"
+                                                        :class="hasService(friend, service.id) ? getStackActiveClass(service.stack) : 'bg-gray-700 text-gray-400'"
+                                                        class="px-3 py-1 rounded text-sm hover:opacity-80 transition-opacity flex items-center gap-1">
+                                                    <span x-text="service.icon" class="text-sm"></span>
+                                                    <span x-text="service.name"></span>
+                                                    <span x-show="isAutoAuth(service)" class="text-green-300 text-xs" title="auto-login">↗</span>
+                                                    <span x-show="needsManualLogin(service)" class="text-yellow-300 text-xs" title="manual login">✏️</span>
+                                                    <span x-show="!isAutoAuth(service) && !needsManualLogin(service)" class="text-gray-300 text-xs" title="external account">🔒</span>
+                                                </button>
+                                            </template>
+                                        </div>
                                 </div>
                             </div>
                         </template>
@@ -420,7 +468,7 @@
                 </div>
 
                 <!-- SERVICES TAB -->
-                <div x-show="adminTab === 'services'" x-data="{ showOtherServices: false }" data-testid="services-panel">
+                <div x-show="adminTab === 'services'" x-data="{ expandedStacks: {} }" data-testid="services-panel">
                     <!-- Default Services List -->
                     <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
                         <div class="bg-gray-700 px-4 py-3 flex items-center justify-between">
@@ -487,81 +535,81 @@
                         </template>
                     </div>
 
-                    <!-- Other Services (Collapsed) -->
-                    <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
-                        <button @click="showOtherServices = !showOtherServices"
-                                class="w-full bg-gray-700 px-4 py-3 flex items-center justify-between hover:bg-gray-650 transition-colors">
-                            <h3 class="font-semibold">
-                                Other Services
-                                <span class="text-gray-400 text-sm font-normal">(<span x-text="services.filter(s => !s.is_default).length"></span> services)</span>
-                            </h3>
-                            <span x-text="showOtherServices ? '▼' : '▶'" class="text-gray-400"></span>
-                        </button>
-                        <div x-show="showOtherServices" x-transition:enter="transition ease-out duration-200"
-                             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                             x-transition:leave="transition ease-in duration-150"
-                             x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-                            <table class="w-full">
-                                <thead class="bg-gray-750">
-                                    <tr>
-                                        <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
-                                        <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
-                                        <th class="px-4 py-2 text-left text-sm text-gray-400">Description</th>
-                                        <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
-                                        <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <template x-for="service in services.filter(s => !s.is_default)" :key="service.id">
-                                        <tr class="border-t border-gray-700">
-                                            <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
-                                            <td class="px-4 py-3">
-                                                <span class="font-medium" x-text="service.name"></span>
-                                            </td>
-                                            <td class="px-4 py-3 text-sm max-w-xs">
-                                                <template x-if="editingServiceId !== service.id">
-                                                    <div class="flex items-center gap-2">
-                                                        <span class="text-gray-400" x-text="service.description || '-'"></span>
-                                                        <button @click="startEditDescription(service)"
-                                                                class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
-                                                    </div>
-                                                </template>
-                                                <template x-if="editingServiceId === service.id">
-                                                    <div class="flex items-center gap-2">
-                                                        <input type="text" x-model="editingDescription"
-                                                               @keyup.enter="saveDescription(service)"
-                                                               @keyup.escape="cancelEditDescription()"
-                                                               class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm w-full focus:outline-none focus:border-blue-500">
-                                                        <button @click="saveDescription(service)"
-                                                                class="text-green-400 hover:text-green-300 text-xs">Save</button>
-                                                        <button @click="cancelEditDescription()"
-                                                                class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
-                                                    </div>
-                                                </template>
-                                            </td>
-                                            <td class="px-4 py-3 text-sm truncate max-w-xs">
-                                                <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
-                                                   target="_blank"
-                                                   class="text-blue-400 hover:text-blue-300 hover:underline"
-                                                   x-text="service.subdomain ? service.subdomain + '.blaha.io' : service.url"></a>
-                                            </td>
-                                            <td class="px-4 py-3 text-right space-x-2">
-                                                <button @click="toggleServiceDefault(service)"
-                                                        class="text-green-400 hover:text-green-300 text-sm">Make Default</button>
-                                                <button x-show="service.subdomain" @click="copyPreauthUrl(service.id)"
-                                                        class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
-                                                <button @click="deleteService(service.id)"
-                                                        class="text-red-400 hover:text-red-300 text-sm">Delete</button>
-                                            </td>
+                    <!-- Other Services - Grouped by Stack -->
+                    <template x-for="group in getNonDefaultGroupedServices()" :key="group.stack || 'other'">
+                        <div class="bg-gray-800 rounded-lg overflow-hidden mb-4">
+                            <button @click="expandedStacks[group.stack || 'other'] = !expandedStacks[group.stack || 'other']"
+                                    class="w-full bg-gray-700 px-4 py-3 flex items-center justify-between hover:bg-gray-650 transition-colors">
+                                <h3 class="font-semibold flex items-center gap-2">
+                                    <span x-text="getStackIcon(group.stack)"></span>
+                                    <span x-text="group.stack ? getStackLabel(group.stack) : 'Other'"></span>
+                                    <span class="text-gray-400 text-sm font-normal">(<span x-text="group.services.length"></span>)</span>
+                                </h3>
+                                <span x-text="expandedStacks[group.stack || 'other'] ? '▼' : '▶'" class="text-gray-400"></span>
+                            </button>
+                            <div x-show="expandedStacks[group.stack || 'other']" x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                 x-transition:leave="transition ease-in duration-150"
+                                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+                                <table class="w-full">
+                                    <thead class="bg-gray-750">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
+                                            <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
+                                            <th class="px-4 py-2 text-left text-sm text-gray-400">Description</th>
+                                            <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
+                                            <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
                                         </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                            <template x-if="services.filter(s => !s.is_default).length === 0">
-                                <div class="px-4 py-6 text-center text-gray-500">No other services</div>
-                            </template>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="service in group.services" :key="service.id">
+                                            <tr class="border-t border-gray-700">
+                                                <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
+                                                <td class="px-4 py-3">
+                                                    <span class="font-medium" x-text="service.name"></span>
+                                                </td>
+                                                <td class="px-4 py-3 text-sm max-w-xs">
+                                                    <template x-if="editingServiceId !== service.id">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-gray-400" x-text="service.description || '-'"></span>
+                                                            <button @click="startEditDescription(service)"
+                                                                    class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="editingServiceId === service.id">
+                                                        <div class="flex items-center gap-2">
+                                                            <input type="text" x-model="editingDescription"
+                                                                   @keyup.enter="saveDescription(service)"
+                                                                   @keyup.escape="cancelEditDescription()"
+                                                                   class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm w-full focus:outline-none focus:border-blue-500">
+                                                            <button @click="saveDescription(service)"
+                                                                    class="text-green-400 hover:text-green-300 text-xs">Save</button>
+                                                            <button @click="cancelEditDescription()"
+                                                                    class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
+                                                        </div>
+                                                    </template>
+                                                </td>
+                                                <td class="px-4 py-3 text-sm truncate max-w-xs">
+                                                    <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
+                                                       target="_blank"
+                                                       class="text-blue-400 hover:text-blue-300 hover:underline"
+                                                       x-text="service.subdomain ? service.subdomain + '.blaha.io' : service.url"></a>
+                                                </td>
+                                                <td class="px-4 py-3 text-right space-x-2">
+                                                    <button @click="toggleServiceDefault(service)"
+                                                            class="text-green-400 hover:text-green-300 text-sm">Make Default</button>
+                                                    <button x-show="service.subdomain" @click="copyPreauthUrl(service.id)"
+                                                            class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
+                                                    <button @click="deleteService(service.id)"
+                                                            class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+                    </template>
 
                     <!-- Add Service Form (moved to bottom) -->
                     <div class="bg-gray-800 rounded-lg p-6">
@@ -614,6 +662,8 @@
                 nextcloudStatus: { connected: false, error: '' },
                 editingServiceId: null,
                 editingDescription: '',
+                expandedFriends: {},
+                toast: { show: false, message: '' },
 
                 // Friend state
                 friendName: '',
@@ -866,6 +916,13 @@
 
                 copyUrl(token) {
                     navigator.clipboard.writeText(`https://blaha.io/f/${token}`);
+                    this.showToast('Link copied!');
+                },
+
+                showToast(message, duration = 2000) {
+                    this.toast.message = message;
+                    this.toast.show = true;
+                    setTimeout(() => { this.toast.show = false; }, duration);
                 },
 
                 getServiceUrl(service) {
@@ -936,6 +993,7 @@
 
                 copyToClipboard(text) {
                     navigator.clipboard.writeText(text);
+                    this.showToast('Copied!');
                 },
 
                 async copyPreauthUrl(serviceId) {
@@ -944,13 +1002,13 @@
                         if (resp.ok) {
                             const data = await resp.json();
                             await navigator.clipboard.writeText(data.url);
-                            alert(`Pre-auth URL for ${data.service} copied to clipboard!`);
+                            this.showToast(`Auth URL copied for ${data.service}`);
                         } else {
                             const err = await resp.json();
-                            alert(`Error: ${err.detail}`);
+                            this.showToast(`Error: ${err.detail}`);
                         }
                     } catch (e) {
-                        alert('Failed to get pre-auth URL');
+                        this.showToast('Failed to get pre-auth URL');
                     }
                 },
 
@@ -974,6 +1032,29 @@
                 formatDate(dateStr) {
                     if (!dateStr) return '';
                     return new Date(dateStr).toLocaleDateString();
+                },
+
+                timeAgo(dateStr) {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    const now = new Date();
+                    const seconds = Math.floor((now - date) / 1000);
+
+                    const intervals = [
+                        { label: 'y', seconds: 31536000 },
+                        { label: 'mo', seconds: 2592000 },
+                        { label: 'd', seconds: 86400 },
+                        { label: 'h', seconds: 3600 },
+                        { label: 'm', seconds: 60 }
+                    ];
+
+                    for (const interval of intervals) {
+                        const count = Math.floor(seconds / interval.seconds);
+                        if (count >= 1) {
+                            return count + interval.label + ' ago';
+                        }
+                    }
+                    return 'just now';
                 },
 
                 // Request access methods
@@ -1056,6 +1137,103 @@
                     } catch (e) {
                         alert('Failed to save description');
                     }
+                },
+
+                // Stack grouping helpers
+                getGroupedServices(services) {
+                    // Group services by stack
+                    const groups = {};
+                    const noStack = [];
+
+                    services.forEach(service => {
+                        const stack = service.stack || '';
+                        if (stack) {
+                            if (!groups[stack]) groups[stack] = [];
+                            groups[stack].push(service);
+                        } else {
+                            noStack.push(service);
+                        }
+                    });
+
+                    // Convert to array, only showing header for stacks with 2+ services
+                    const result = [];
+
+                    // Add stacks with 2+ services first (with headers)
+                    Object.keys(groups).sort().forEach(stack => {
+                        if (groups[stack].length >= 2) {
+                            result.push({ stack, services: groups[stack] });
+                        }
+                    });
+
+                    // Combine single-item stacks and no-stack items into ungrouped
+                    const ungrouped = [...noStack];
+                    Object.keys(groups).forEach(stack => {
+                        if (groups[stack].length < 2) {
+                            ungrouped.push(...groups[stack]);
+                        }
+                    });
+
+                    if (ungrouped.length > 0) {
+                        result.push({ stack: '', services: ungrouped });
+                    }
+
+                    return result;
+                },
+
+                getNonDefaultGroupedServices() {
+                    // Group non-default services by stack for admin panel
+                    const nonDefault = this.services.filter(s => !s.is_default);
+                    const groups = {};
+                    const noStack = [];
+
+                    nonDefault.forEach(service => {
+                        const stack = service.stack || '';
+                        if (stack) {
+                            if (!groups[stack]) groups[stack] = [];
+                            groups[stack].push(service);
+                        } else {
+                            noStack.push(service);
+                        }
+                    });
+
+                    // Convert to array - each stack gets its own section
+                    const result = [];
+
+                    // Add stacks in alphabetical order
+                    Object.keys(groups).sort().forEach(stack => {
+                        result.push({ stack, services: groups[stack] });
+                    });
+
+                    // Add "Other" (no stack) at the end if any
+                    if (noStack.length > 0) {
+                        result.push({ stack: '', services: noStack });
+                    }
+
+                    return result;
+                },
+
+                getStackIcon(stack) {
+                    const icons = {
+                        'media': '🎬',
+                        'infra': '🔧',
+                        'games': '🎮',
+                        'jitsi': '📹',
+                        'priorities': '📋',
+                        'chat': '💬'
+                    };
+                    return icons[stack] || '📦';
+                },
+
+                getStackLabel(stack) {
+                    const labels = {
+                        'media': 'Media',
+                        'infra': 'Infrastructure',
+                        'games': 'Games',
+                        'jitsi': 'Video Chat',
+                        'priorities': 'Priorities',
+                        'chat': 'Chat'
+                    };
+                    return labels[stack] || stack.charAt(0).toUpperCase() + stack.slice(1);
                 }
             }
         }
