@@ -4,8 +4,8 @@ from integrations.ombi import create_ombi_user, delete_ombi_user
 from integrations.jellyfin import create_jellyfin_user, delete_jellyfin_user
 
 # Service names that trigger auto-account creation (case-insensitive match)
+# Plex removed - users need plex.tv accounts, we just skip basic auth for them
 MANAGED_SERVICES = {
-    "plex": "plex_user_id",
     "ombi": "ombi_user_id",
     "jellyfin": "jellyfin_user_id"
 }
