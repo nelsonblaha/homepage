@@ -1,9 +1,9 @@
 import os
 import uuid
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Depends, Response, Cookie, Request
+from fastapi import FastAPI, HTTPException, Depends, Response, Cookie, Request, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from typing import Optional
@@ -26,8 +26,9 @@ OMBI_API_KEY = os.environ.get("OMBI_API_KEY", "")
 JELLYFIN_URL = os.environ.get("JELLYFIN_URL", "")
 JELLYFIN_API_KEY = os.environ.get("JELLYFIN_API_KEY", "")
 
-# Store active admin sessions (in production, use Redis or similar)
-admin_sessions: set[str] = set()
+# Session durations
+SESSION_DURATION_SHORT = timedelta(hours=24)
+SESSION_DURATION_LONG = timedelta(days=30)  # "Remember me"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,9 +37,65 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="blaha.io", lifespan=lifespan)
 
+# =============================================================================
+# SESSION MANAGEMENT (Database-backed)
+# =============================================================================
+
+async def create_session(session_type: str, user_id: int = None, remember: bool = False, user_agent: str = "") -> tuple[str, datetime]:
+    """Create a new session and store in database."""
+    token = secrets.token_hex(32)
+    duration = SESSION_DURATION_LONG if remember else SESSION_DURATION_SHORT
+    expires_at = datetime.now() + duration
+
+    async with await get_db() as db:
+        await db.execute(
+            "INSERT INTO sessions (token, type, user_id, expires_at, user_agent) VALUES (?, ?, ?, ?, ?)",
+            (token, session_type, user_id, expires_at.isoformat(), user_agent)
+        )
+        await db.commit()
+
+    return token, expires_at
+
+async def validate_session(token: str) -> dict | None:
+    """Validate a session token. Returns session info or None if invalid/expired."""
+    if not token:
+        return None
+
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        cursor = await db.execute(
+            "SELECT * FROM sessions WHERE token = ?", (token,)
+        )
+        session = await cursor.fetchone()
+
+        if not session:
+            return None
+
+        # Check expiry
+        expires_at = datetime.fromisoformat(session["expires_at"])
+        if datetime.now() > expires_at:
+            await db.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            await db.commit()
+            return None
+
+        return session
+
+async def delete_session(token: str):
+    """Delete a session from the database."""
+    async with await get_db() as db:
+        await db.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        await db.commit()
+
+async def cleanup_expired_sessions():
+    """Remove all expired sessions."""
+    async with await get_db() as db:
+        await db.execute("DELETE FROM sessions WHERE expires_at < ?", (datetime.now().isoformat(),))
+        await db.commit()
+
 # Dependency to verify admin session
 async def verify_admin(admin_token: Optional[str] = Cookie(default=None)):
-    if not admin_token or admin_token not in admin_sessions:
+    session = await validate_session(admin_token)
+    if not session or session["type"] != "admin":
         raise HTTPException(status_code=401, detail="Not authenticated")
     return True
 
@@ -47,34 +104,120 @@ async def verify_admin(admin_token: Optional[str] = Cookie(default=None)):
 # =============================================================================
 
 @app.post("/api/admin/login")
-async def admin_login(login: AdminLogin, response: Response):
+async def admin_login(login: AdminLogin, response: Response, request: Request):
     if login.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    session_token = secrets.token_hex(32)
-    admin_sessions.add(session_token)
+    user_agent = request.headers.get("user-agent", "")
+    remember = getattr(login, "remember", False)
+    session_token, expires_at = await create_session("admin", remember=remember, user_agent=user_agent)
+
+    duration = SESSION_DURATION_LONG if remember else SESSION_DURATION_SHORT
     response.set_cookie(
         key="admin_token",
         value=session_token,
         httponly=True,
         secure=True,
-        samesite="strict",
-        max_age=86400  # 24 hours
+        samesite="lax",  # Changed from strict to allow cross-subdomain
+        max_age=int(duration.total_seconds()),
+        domain=".blaha.io"  # Allow cookie across subdomains
     )
     return {"status": "ok"}
 
 @app.get("/api/admin/verify")
 async def verify_admin_session(admin_token: Optional[str] = Cookie(default=None)):
-    if admin_token and admin_token in admin_sessions:
-        return {"authenticated": True}
+    session = await validate_session(admin_token)
+    if session and session["type"] == "admin":
+        return {"authenticated": True, "type": "admin"}
     return {"authenticated": False}
 
 @app.post("/api/admin/logout")
 async def admin_logout(response: Response, admin_token: Optional[str] = Cookie(default=None)):
     if admin_token:
-        admin_sessions.discard(admin_token)
-    response.delete_cookie("admin_token")
+        await delete_session(admin_token)
+    response.delete_cookie("admin_token", domain=".blaha.io")
     return {"status": "ok"}
+
+# =============================================================================
+# FORWARD AUTH (for nginx auth_request)
+# =============================================================================
+
+@app.get("/api/auth/verify")
+async def forward_auth_verify(
+    request: Request,
+    admin_token: Optional[str] = Cookie(default=None),
+    x_original_uri: Optional[str] = Header(default=None, alias="X-Original-URI"),
+    x_forwarded_host: Optional[str] = Header(default=None, alias="X-Forwarded-Host")
+):
+    """
+    Verify authentication for nginx forward auth (auth_request).
+    Returns 200 if authorized, 401 if not authenticated, 403 if not authorized for this service.
+    Sets X-Remote-User header for the upstream service.
+    """
+    response_headers = {}
+
+    # Check admin session first
+    session = await validate_session(admin_token)
+    if session and session["type"] == "admin":
+        response_headers["X-Remote-User"] = "admin"
+        response_headers["X-Remote-Email"] = "admin@blaha.io"
+        return Response(status_code=200, headers=response_headers)
+
+    # Check friend session
+    if session and session["type"] == "friend":
+        async with await get_db() as db:
+            db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+            cursor = await db.execute(
+                "SELECT name FROM friends WHERE id = ?", (session["user_id"],)
+            )
+            friend = await cursor.fetchone()
+
+            if friend:
+                # Check if friend has access to this service (by subdomain)
+                subdomain = x_forwarded_host.split(".")[0] if x_forwarded_host else ""
+                cursor = await db.execute(
+                    """SELECT s.name FROM services s
+                       JOIN friend_services fs ON s.id = fs.service_id
+                       WHERE fs.friend_id = ? AND s.subdomain = ?""",
+                    (session["user_id"], subdomain)
+                )
+                has_access = await cursor.fetchone()
+
+                if has_access:
+                    response_headers["X-Remote-User"] = friend["name"]
+                    response_headers["X-Remote-Email"] = f"{friend['name'].lower().replace(' ', '')}@friends.blaha.io"
+                    return Response(status_code=200, headers=response_headers)
+                else:
+                    return Response(status_code=403)  # Not authorized for this service
+
+    return Response(status_code=401)  # Not authenticated
+
+@app.post("/api/auth/friend-session")
+async def create_friend_session(token: str, response: Response, request: Request):
+    """Create a session for a friend using their token. Called when visiting /f/{token}."""
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        cursor = await db.execute("SELECT id, name FROM friends WHERE token = ?", (token,))
+        friend = await cursor.fetchone()
+
+        if not friend:
+            raise HTTPException(status_code=404, detail="Invalid token")
+
+        user_agent = request.headers.get("user-agent", "")
+        session_token, expires_at = await create_session(
+            "friend", user_id=friend["id"], remember=True, user_agent=user_agent
+        )
+
+        response.set_cookie(
+            key="admin_token",  # Reuse same cookie name for simplicity
+            value=session_token,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=int(SESSION_DURATION_LONG.total_seconds()),
+            domain=".blaha.io"
+        )
+        return {"status": "ok", "name": friend["name"]}
 
 # =============================================================================
 # SERVICES (Admin only)

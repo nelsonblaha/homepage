@@ -14,9 +14,30 @@
     <div x-data="app()" x-init="init()" x-cloak>
         <!-- PUBLIC LANDING -->
         <template x-if="view === 'public'">
-            <div class="flex flex-col items-center justify-center min-h-screen">
+            <div class="flex flex-col items-center justify-center min-h-screen px-4">
                 <h1 class="text-6xl font-bold text-blue-400 mb-4">blaha.io</h1>
-                <p class="text-gray-500 text-sm">Private services</p>
+                <p class="text-gray-500 text-sm mb-8">Private services</p>
+
+                <!-- Admin Login -->
+                <div class="bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-sm">
+                    <form @submit.prevent="adminLogin" autocomplete="on">
+                        <input type="text" name="username" autocomplete="username" value="admin"
+                               class="hidden" aria-hidden="true">
+                        <input type="password" x-model="adminPassword" placeholder="Admin password"
+                               name="password" autocomplete="current-password"
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-3 focus:outline-none focus:border-blue-500">
+                        <label class="flex items-center gap-2 text-gray-300 text-sm mb-3">
+                            <input type="checkbox" x-model="rememberMe"
+                                   class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                            Remember me
+                        </label>
+                        <div x-show="loginError" class="text-red-400 text-sm mb-3" x-text="loginError"></div>
+                        <button type="submit"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
+                            Login
+                        </button>
+                    </form>
+                </div>
             </div>
         </template>
 
@@ -116,6 +137,11 @@
                         <input type="password" x-model="adminPassword" placeholder="Password"
                                name="password" autocomplete="current-password" id="admin-password"
                                class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-4 focus:outline-none focus:border-blue-500">
+                        <label class="flex items-center gap-2 text-gray-300 mb-4">
+                            <input type="checkbox" x-model="rememberMe"
+                                   class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                            Remember me for 30 days
+                        </label>
                         <div x-show="loginError" class="text-red-400 text-sm mb-4" x-text="loginError"></div>
                         <button type="submit"
                                 class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
@@ -462,6 +488,7 @@
 
                 // Admin state
                 adminPassword: '',
+                rememberMe: true,
                 loginError: '',
                 services: [],
                 friends: [],
@@ -514,7 +541,7 @@
                         const resp = await fetch('/api/admin/login', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ password: this.adminPassword })
+                            body: JSON.stringify({ password: this.adminPassword, remember: this.rememberMe })
                         });
                         if (resp.ok) {
                             this.view = 'admin';

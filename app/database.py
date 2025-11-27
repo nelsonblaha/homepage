@@ -63,6 +63,18 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # Sessions table for persistent auth
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                user_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL,
+                user_agent TEXT DEFAULT ''
+            )
+        """)
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS friends (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

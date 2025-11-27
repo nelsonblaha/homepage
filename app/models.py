@@ -50,6 +50,7 @@ class FriendView(BaseModel):
 
 class AdminLogin(BaseModel):
     password: str
+    remember: bool = False  # "Remember me" for 30 days instead of 24 hours
 
 class TokenResponse(BaseModel):
     token: str
