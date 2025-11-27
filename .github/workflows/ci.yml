@@ -77,6 +77,8 @@ jobs:
 
       - name: Setup Ombi for CI
         id: ombi-setup
+        env:
+          OMBI_URL: http://localhost:3580
         run: |
           chmod +x scripts/setup-ombi-ci.py
           python scripts/setup-ombi-ci.py
