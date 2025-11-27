@@ -1394,27 +1394,40 @@
                         }
                     });
 
-                    // Convert to array - each stack gets its own section
+                    // Convert to array - merge single-item groups into "Other"
                     const result = [];
+                    const ungrouped = [...noStack];
 
                     // Sort stacks: alphabetically but exclude 'infra' (added at very end)
                     const sortedStacks = Object.keys(groups)
                         .filter(s => s !== 'infra')
                         .sort();
 
-                    // Add stacks (except infra)
+                    // Add stacks with 2+ services, merge single-item stacks into Other
                     sortedStacks.forEach(stack => {
-                        result.push({ stack, services: groups[stack] });
+                        if (groups[stack].length >= 2) {
+                            result.push({ stack, services: groups[stack] });
+                        } else {
+                            ungrouped.push(...groups[stack]);
+                        }
                     });
 
-                    // Add "Other" (no stack)
-                    if (noStack.length > 0) {
-                        result.push({ stack: '', services: noStack });
+                    // Add "Other" (no stack + single-item stacks)
+                    if (ungrouped.length > 0) {
+                        result.push({ stack: '', services: ungrouped });
                     }
 
-                    // Add Infrastructure last
-                    if (groups['infra']) {
+                    // Add Infrastructure last (only if 2+ services)
+                    if (groups['infra'] && groups['infra'].length >= 2) {
                         result.push({ stack: 'infra', services: groups['infra'] });
+                    } else if (groups['infra']) {
+                        // Single infra item goes to Other
+                        const otherGroup = result.find(g => g.stack === '');
+                        if (otherGroup) {
+                            otherGroup.services.push(...groups['infra']);
+                        } else {
+                            result.push({ stack: '', services: groups['infra'] });
+                        }
                     }
 
                     return result;
