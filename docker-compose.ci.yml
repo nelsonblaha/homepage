@@ -1,0 +1,54 @@
+version: '3.8'
+
+# CI test environment - spins up real containers for integration testing
+services:
+  app:
+    build: .
+    ports:
+      - "8100:8000"
+    environment:
+      - ADMIN_PASSWORD=testpassword123
+      - SESSION_SECRET=testsecret1234567890abcdef
+      - DB_PATH=/app/data/test.db
+      - PLEX_TOKEN=
+      - PLEX_URL=
+      - OMBI_URL=http://ombi:3579
+      - OMBI_API_KEY=${OMBI_API_KEY:-}
+      - JELLYFIN_URL=http://jellyfin:8096
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY:-}
+    depends_on:
+      ombi:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ci-network
+
+  ombi:
+    image: linuxserver/ombi:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Chicago
+    ports:
+      - "3579:3579"
+    volumes:
+      - ombi-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3579/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - ci-network
+
+volumes:
+  ombi-config:
+
+networks:
+  ci-network:
+    driver: bridge

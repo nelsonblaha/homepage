@@ -39,6 +39,12 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # Migration: Add auth_type column (basic, jellyfin, ombi, none)
+        try:
+            await db.execute("ALTER TABLE services ADD COLUMN auth_type TEXT DEFAULT 'none'")
+        except:
+            pass  # Column already exists
+
         # Migration: Add plex_user_id column to friends
         try:
             await db.execute("ALTER TABLE friends ADD COLUMN plex_user_id TEXT DEFAULT ''")
@@ -57,9 +63,21 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # Migration: Add ombi_password column to friends
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN ombi_password TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
         # Migration: Add jellyfin_user_id column to friends
         try:
             await db.execute("ALTER TABLE friends ADD COLUMN jellyfin_user_id TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
+        # Migration: Add jellyfin_password column to friends
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN jellyfin_password TEXT DEFAULT ''")
         except:
             pass  # Column already exists
 

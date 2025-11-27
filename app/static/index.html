@@ -53,10 +53,15 @@
                     <span x-text="friendError"></span>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="services-grid">
                     <template x-for="service in friendServices" :key="service.id">
-                        <a :href="service.url" target="_blank"
-                           class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500">
+                        <a :href="getServiceUrl(service)" target="_blank"
+                           class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative">
+                            <!-- Auth indicator -->
+                            <span x-show="isAutoAuth(service)"
+                                  class="absolute top-2 right-2 text-green-400 text-sm" title="auto-login">↗</span>
+                            <span x-show="!isAutoAuth(service)"
+                                  class="absolute top-2 right-2 text-yellow-400 text-sm" title="account needed">🔒</span>
                             <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
                             <div class="font-semibold" x-text="service.name"></div>
                             <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
@@ -162,13 +167,13 @@
 
                 <!-- TABS -->
                 <div class="flex space-x-4 mb-6 border-b border-gray-700">
-                    <button @click="adminTab = 'friends'"
+                    <button @click="adminTab = 'friends'" data-testid="tab-friends"
                             :class="adminTab === 'friends' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
                             class="px-4 py-2 -mb-px">Friends</button>
-                    <button @click="adminTab = 'services'"
+                    <button @click="adminTab = 'services'" data-testid="tab-services"
                             :class="adminTab === 'services' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
                             class="px-4 py-2 -mb-px">Services</button>
-                    <button @click="adminTab = 'requests'"
+                    <button @click="adminTab = 'requests'" data-testid="tab-requests"
                             :class="adminTab === 'requests' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
                             class="px-4 py-2 -mb-px relative">
                         Requests
@@ -181,7 +186,7 @@
                 <!-- FRIENDS TAB -->
                 <div x-show="adminTab === 'friends'">
                     <!-- Integration Status Bar -->
-                    <div class="bg-gray-800 rounded-lg p-4 mb-6">
+                    <div class="bg-gray-800 rounded-lg p-4 mb-6" data-testid="integrations">
                         <div class="flex items-center justify-between mb-2">
                             <span class="font-semibold text-gray-300">Auto-Account Integrations</span>
                             <button @click="checkAllStatus" class="text-blue-400 hover:text-blue-300 text-sm">Refresh All</button>
@@ -228,9 +233,9 @@
                     <div class="bg-gray-800 rounded-lg p-6 mb-6">
                         <h3 class="text-lg font-semibold mb-4">Add Friend</h3>
                         <form @submit.prevent="addFriend" class="flex flex-wrap gap-4">
-                            <input type="text" x-model="newFriendName" placeholder="Friend's name"
+                            <input type="text" x-model="newFriendName" placeholder="Friend's name" data-testid="new-friend-input"
                                    class="flex-1 min-w-48 bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
-                            <button type="submit"
+                            <button type="submit" data-testid="add-friend-btn"
                                     class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded transition-colors">
                                 Add
                             </button>
@@ -245,8 +250,9 @@
                                     <div>
                                         <h4 class="text-xl font-semibold" x-text="friend.name"></h4>
                                         <div class="flex items-center gap-2 mt-1">
-                                            <code class="text-sm text-gray-400 bg-gray-700 px-2 py-1 rounded"
-                                                  x-text="'blaha.io/f/' + friend.token"></code>
+                                            <a :href="'/f/' + friend.token" data-testid="friend-link"
+                                               class="text-sm text-gray-400 bg-gray-700 px-2 py-1 rounded hover:text-blue-300"
+                                               x-text="'blaha.io/f/' + friend.token"></a>
                                             <button @click="copyUrl(friend.token)"
                                                     class="text-blue-400 hover:text-blue-300 text-sm">Copy</button>
                                         </div>
@@ -276,6 +282,8 @@
                                                     class="px-3 py-1 rounded text-sm hover:opacity-80 transition-opacity flex items-center gap-1">
                                                 <span x-text="service.icon" class="text-sm"></span>
                                                 <span x-text="service.name"></span>
+                                                <span x-show="isAutoAuth(service)" class="text-green-300 text-xs" title="auto-login">↗</span>
+                                                <span x-show="!isAutoAuth(service)" class="text-yellow-300 text-xs" title="account needed">🔒</span>
                                             </button>
                                         </template>
                                     </div>
@@ -324,16 +332,6 @@
 
                 <!-- SERVICES TAB -->
                 <div x-show="adminTab === 'services'" x-data="{ showOtherServices: false }">
-                    <!-- Stack Legend -->
-                    <div class="flex flex-wrap gap-2 mb-4">
-                        <span class="text-gray-400 text-sm">Stacks:</span>
-                        <span class="px-2 py-1 rounded text-xs bg-purple-900 text-purple-200">media</span>
-                        <span class="px-2 py-1 rounded text-xs bg-blue-900 text-blue-200">infra</span>
-                        <span class="px-2 py-1 rounded text-xs bg-green-900 text-green-200">jitsi</span>
-                        <span class="px-2 py-1 rounded text-xs bg-orange-900 text-orange-200">priorities</span>
-                        <span class="px-2 py-1 rounded text-xs bg-gray-700 text-gray-300">other</span>
-                    </div>
-
                     <!-- Default Services List -->
                     <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
                         <div class="bg-gray-700 px-4 py-3 flex items-center justify-between">
@@ -344,7 +342,6 @@
                                 <tr>
                                     <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
                                     <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
-                                    <th class="px-4 py-2 text-left text-sm text-gray-400">Stack</th>
                                     <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
                                     <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
                                 </tr>
@@ -356,12 +353,6 @@
                                         <td class="px-4 py-3">
                                             <span class="font-medium" x-text="service.name"></span>
                                         </td>
-                                        <td class="px-4 py-3">
-                                            <span x-show="service.stack"
-                                                  :class="getStackClass(service.stack)"
-                                                  class="px-2 py-1 rounded text-xs"
-                                                  x-text="service.stack"></span>
-                                        </td>
                                         <td class="px-4 py-3 text-sm truncate max-w-xs">
                                             <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
                                                target="_blank"
@@ -369,6 +360,8 @@
                                                x-text="service.subdomain ? service.subdomain + '.blaha.io' : service.url"></a>
                                         </td>
                                         <td class="px-4 py-3 text-right space-x-2">
+                                            <button @click="toggleServiceDefault(service)"
+                                                    class="text-yellow-400 hover:text-yellow-300 text-sm">Remove Default</button>
                                             <button x-show="service.subdomain" @click="copyPreauthUrl(service.id)"
                                                     class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
                                             <button @click="deleteService(service.id)"
@@ -402,7 +395,6 @@
                                     <tr>
                                         <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
                                         <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
-                                        <th class="px-4 py-2 text-left text-sm text-gray-400">Stack</th>
                                         <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
                                         <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
                                     </tr>
@@ -414,12 +406,6 @@
                                             <td class="px-4 py-3">
                                                 <span class="font-medium" x-text="service.name"></span>
                                             </td>
-                                            <td class="px-4 py-3">
-                                                <span x-show="service.stack"
-                                                      :class="getStackClass(service.stack)"
-                                                      class="px-2 py-1 rounded text-xs"
-                                                      x-text="service.stack"></span>
-                                            </td>
                                             <td class="px-4 py-3 text-sm truncate max-w-xs">
                                                 <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
                                                    target="_blank"
@@ -427,6 +413,8 @@
                                                    x-text="service.subdomain ? service.subdomain + '.blaha.io' : service.url"></a>
                                             </td>
                                             <td class="px-4 py-3 text-right space-x-2">
+                                                <button @click="toggleServiceDefault(service)"
+                                                        class="text-green-400 hover:text-green-300 text-sm">Make Default</button>
                                                 <button x-show="service.subdomain" @click="copyPreauthUrl(service.id)"
                                                         class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
                                                 <button @click="deleteService(service.id)"
@@ -456,14 +444,6 @@
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
                             <input type="text" x-model="newService.subdomain" placeholder="Subdomain (e.g. ombi)"
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
-                            <select x-model="newService.stack"
-                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
-                                <option value="">No stack</option>
-                                <option value="media">media</option>
-                                <option value="infra">infra</option>
-                                <option value="jitsi">jitsi</option>
-                                <option value="priorities">priorities</option>
-                            </select>
                             <label class="flex items-center gap-2 text-gray-300">
                                 <input type="checkbox" x-model="newService.is_default"
                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
@@ -494,7 +474,7 @@
                 friends: [],
                 accessRequests: [],
                 newFriendName: '',
-                newService: { name: '', url: '', icon: '', description: '', subdomain: '', stack: '', is_default: false },
+                newService: { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false },
                 plexStatus: { connected: false, username: '', error: '' },
                 ombiStatus: { connected: false, error: '' },
                 jellyfinStatus: { connected: false, serverName: '', error: '' },
@@ -531,6 +511,13 @@
                         const token = path.split('/f/')[1];
                         await this.loadFriendView(token);
                     } else {
+                        // Check if admin is already logged in, redirect to /admin
+                        const resp = await fetch('/api/admin/verify');
+                        const data = await resp.json();
+                        if (data.authenticated) {
+                            window.location.href = '/admin';
+                            return;
+                        }
                         this.view = 'public';
                     }
                 },
@@ -666,7 +653,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.newService)
                     });
-                    this.newService = { name: '', url: '', icon: '', description: '', subdomain: '', stack: '', is_default: false };
+                    this.newService = { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false };
                     await this.loadAdminData();
                 },
 
@@ -704,6 +691,12 @@
                             this.friendName = data.name;
                             this.friendServices = data.services;
                             this.view = 'friend';
+                            // Create a session for cross-subdomain auth
+                            await fetch('/api/auth/friend-session', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: `token=${encodeURIComponent(token)}`
+                            });
                         } else {
                             this.friendError = 'Invalid or expired link';
                             this.view = 'friend';
@@ -716,6 +709,32 @@
 
                 copyUrl(token) {
                     navigator.clipboard.writeText(`https://blaha.io/f/${token}`);
+                },
+
+                getServiceUrl(service) {
+                    // Route services with subdomains through unified auth endpoint
+                    // This handles basic auth (preauth URL), jellyfin (API auth), and forward auth
+                    if (service.subdomain) {
+                        return `/auth/${service.subdomain}`;
+                    }
+                    return service.url;
+                },
+
+                isAutoAuth(service) {
+                    // Determines if a service auto-authenticates (no user intervention needed)
+                    // Plex always requires plex.tv login
+                    if (service.name.toLowerCase() === 'plex') return false;
+
+                    const authType = service.auth_type || 'none';
+
+                    // These auth types handle login automatically
+                    if (authType === 'jellyfin' || authType === 'ombi') return true;
+
+                    // 'none' with subdomain = forward auth (auto)
+                    if (authType === 'none' && service.subdomain) return true;
+
+                    // 'basic' preauth URLs are blocked by Chrome, so not truly auto
+                    return false;
                 },
 
                 async copyPreauthUrl(serviceId) {
@@ -731,6 +750,23 @@
                         }
                     } catch (e) {
                         alert('Failed to get pre-auth URL');
+                    }
+                },
+
+                async toggleServiceDefault(service) {
+                    try {
+                        const resp = await fetch(`/api/services/${service.id}/toggle-default`, {
+                            method: 'POST',
+                            credentials: 'include'
+                        });
+                        if (resp.ok) {
+                            await this.loadServices();
+                        } else {
+                            const err = await resp.json();
+                            alert(`Error: ${err.detail}`);
+                        }
+                    } catch (e) {
+                        alert('Failed to toggle default status');
                     }
                 },
 

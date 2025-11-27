@@ -1,0 +1,13 @@
+{
+  "name": "blaha-homepage",
+  "version": "1.0.0",
+  "description": "Cypress tests for blaha-homepage",
+  "scripts": {
+    "cy:run": "cypress run",
+    "cy:open": "cypress open",
+    "test": "cypress run"
+  },
+  "devDependencies": {
+    "cypress": "^13.6.0"
+  }
+}

@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  # Fast unit tests without external dependencies
+  unit-tests:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install app dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start application
+        run: |
+          export ADMIN_PASSWORD=testpassword
+          export SESSION_SECRET=testsecret1234567890abcdef
+          export DB_PATH=/tmp/test-unit.db
+          cd app
+          python -m uvicorn main:app --host 0.0.0.0 --port 5000 &
+          sleep 5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Cypress
+        run: npm ci
+
+      - name: Run unit tests
+        run: npx cypress run --spec "cypress/e2e/*.cy.js"
+        env:
+          CYPRESS_BASE_URL: http://localhost:5000
+          CYPRESS_ADMIN_PASSWORD: testpassword
+
+      - name: Stop application
+        if: always()
+        run: pkill -f "uvicorn main:app" || true
+
+  # Integration tests with real containers (Ombi, Jellyfin)
+  integration-tests:
+    runs-on: self-hosted
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python test dependencies
+        run: pip install requests
+
+      - name: Start test containers
+        run: |
+          docker compose -f docker-compose.ci.yml down -v --remove-orphans || true
+          docker compose -f docker-compose.ci.yml up -d ombi
+          echo "Waiting for Ombi to initialize (this takes a while on first run)..."
+          sleep 30
+
+      - name: Setup Ombi for CI
+        id: ombi-setup
+        run: |
+          chmod +x scripts/setup-ombi-ci.py
+          python scripts/setup-ombi-ci.py
+          if [ -f /tmp/ombi-api-key.txt ]; then
+            echo "OMBI_API_KEY=$(cat /tmp/ombi-api-key.txt)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Start blaha-homepage with Ombi config
+        run: |
+          export ADMIN_PASSWORD=testpassword
+          export SESSION_SECRET=testsecret1234567890abcdef
+          export DB_PATH=/tmp/test-integration.db
+          export OMBI_URL=http://localhost:3579
+          export OMBI_API_KEY=${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
+          pip install -r requirements.txt
+          cd app
+          python -m uvicorn main:app --host 0.0.0.0 --port 8100 &
+          sleep 5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Cypress
+        run: npm ci
+
+      - name: Run Ombi integration tests
+        run: npx cypress run --spec "cypress/e2e/integration/ombi.cy.js"
+        env:
+          CYPRESS_BASE_URL: http://localhost:8100
+          CYPRESS_ADMIN_PASSWORD: testpassword
+          CYPRESS_OMBI_URL: http://localhost:3579
+          CYPRESS_OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f docker-compose.ci.yml down -v --remove-orphans || true
+          pkill -f "uvicorn main:app" || true
+
+  deploy:
+    needs: [unit-tests, integration-tests]
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          cd /home/ben/docker/blaha-homepage
+          git pull origin main
+          docker compose down
+          docker compose up -d --build

@@ -1,0 +1,18 @@
+# Fail2ban jail for blaha-homepage
+# Place in /etc/fail2ban/jail.d/blaha-homepage.local
+
+[blaha-homepage]
+enabled = true
+filter = blaha-homepage
+backend = auto
+
+# Docker container log path (update after container recreation)
+logpath = /var/lib/docker/containers/08c5bba107579337b9d54d91e4dbcb09ac29af3501443544129e00f555d90df6/08c5bba107579337b9d54d91e4dbcb09ac29af3501443544129e00f555d90df6-json.log
+
+# 5 failed attempts in 5 minutes = ban for 1 hour
+maxretry = 5
+findtime = 300
+bantime = 3600
+
+# Ban on ports 80 and 443
+action = iptables-multiport[name=blaha, port="80,443", protocol=tcp]
