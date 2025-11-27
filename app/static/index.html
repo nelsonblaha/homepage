@@ -544,8 +544,8 @@
                             body: JSON.stringify({ password: this.adminPassword, remember: this.rememberMe })
                         });
                         if (resp.ok) {
-                            this.view = 'admin';
-                            await this.loadAdminData();
+                            // Redirect to /admin for proper URL
+                            window.location.href = '/admin';
                         } else {
                             this.loginError = 'Invalid password';
                         }
