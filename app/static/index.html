@@ -157,12 +157,43 @@
             </div>
         </template>
 
+        <!-- ADMIN SERVICES (Landing page for logged-in admin) -->
+        <template x-if="view === 'admin-services'">
+            <div class="max-w-4xl mx-auto px-4 py-12 relative">
+                <!-- Admin link in corner -->
+                <div class="absolute top-4 right-4 flex items-center gap-4">
+                    <a href="/admin" class="text-blue-400 hover:text-blue-300 text-sm font-medium">Admin Panel</a>
+                    <button @click="adminLogout" class="text-gray-400 hover:text-white text-sm">Logout</button>
+                </div>
+
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-blue-400 mb-2">blaha.io</h1>
+                    <p class="text-xl text-gray-300">All Services</p>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <template x-for="service in services" :key="service.id">
+                        <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
+                           target="_blank"
+                           class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative">
+                            <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
+                            <div class="font-semibold" x-text="service.name"></div>
+                            <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
+                        </a>
+                    </template>
+                </div>
+            </div>
+        </template>
+
         <!-- ADMIN PANEL -->
         <template x-if="view === 'admin'">
             <div class="max-w-6xl mx-auto px-4 py-8">
                 <div class="flex justify-between items-center mb-8">
                     <h1 class="text-3xl font-bold text-blue-400">blaha.io Admin</h1>
-                    <button @click="adminLogout" class="text-gray-400 hover:text-white" data-testid="logout-btn">Logout</button>
+                    <div class="flex items-center gap-4">
+                        <a href="/" class="text-blue-400 hover:text-blue-300 text-sm">Services</a>
+                        <button @click="adminLogout" class="text-gray-400 hover:text-white" data-testid="logout-btn">Logout</button>
+                    </div>
                 </div>
 
                 <!-- TABS -->
@@ -557,14 +588,15 @@
                         const token = path.split('/f/')[1];
                         await this.loadFriendView(token);
                     } else {
-                        // Check if admin is already logged in, redirect to /admin
+                        // Check if admin is logged in - show services grid at root
                         const resp = await fetch('/api/admin/verify');
                         const data = await resp.json();
                         if (data.authenticated) {
-                            window.location.href = '/admin';
-                            return;
+                            this.view = 'admin-services';
+                            await this.loadServices();
+                        } else {
+                            this.view = 'public';
                         }
-                        this.view = 'public';
                     }
                 },
 
@@ -577,8 +609,8 @@
                             body: JSON.stringify({ password: this.adminPassword, remember: this.rememberMe })
                         });
                         if (resp.ok) {
-                            // Redirect to /admin for proper URL
-                            window.location.href = '/admin';
+                            // Redirect to services grid (root)
+                            window.location.href = '/';
                         } else {
                             this.loginError = 'Invalid password';
                         }
@@ -591,6 +623,11 @@
                     await fetch('/api/admin/logout', { method: 'POST' });
                     this.view = 'admin-login';
                     this.adminPassword = '';
+                },
+
+                async loadServices() {
+                    const resp = await fetch('/api/services');
+                    this.services = await resp.json();
                 },
 
                 async loadAdminData() {
