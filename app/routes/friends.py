@@ -12,6 +12,7 @@ from integrations.plex import get_plex_account, delete_plex_user
 from integrations.ombi import delete_ombi_user
 from integrations.jellyfin import delete_jellyfin_user
 from integrations.nextcloud import delete_nextcloud_user
+from integrations.overseerr import delete_overseerr_user
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
 
@@ -184,7 +185,7 @@ async def delete_friend(friend_id: int, delete_accounts: bool = True, _: bool = 
 
         if delete_accounts:
             cursor = await db.execute(
-                "SELECT plex_user_id, ombi_user_id, jellyfin_user_id, nextcloud_user_id FROM friends WHERE id = ?",
+                "SELECT plex_user_id, ombi_user_id, jellyfin_user_id, nextcloud_user_id, overseerr_user_id FROM friends WHERE id = ?",
                 (friend_id,)
             )
             friend = await cursor.fetchone()
@@ -197,6 +198,8 @@ async def delete_friend(friend_id: int, delete_accounts: bool = True, _: bool = 
                     await delete_jellyfin_user(friend["jellyfin_user_id"])
                 if friend.get("nextcloud_user_id"):
                     await delete_nextcloud_user(friend["nextcloud_user_id"])
+                if friend.get("overseerr_user_id"):
+                    await delete_overseerr_user(friend["overseerr_user_id"])
 
         await db.execute("DELETE FROM friend_services WHERE friend_id = ?", (friend_id,))
         await db.execute("DELETE FROM friends WHERE id = ?", (friend_id,))
@@ -265,6 +268,7 @@ async def get_friend_credentials(token: str, service_key: str):
             "nextcloud": ("nextcloud_user_id", "nextcloud_password"),
             "ombi": ("ombi_user_id", "ombi_password"),
             "jellyfin": ("jellyfin_user_id", "jellyfin_password"),
+            "overseerr": ("overseerr_user_id", "overseerr_password"),
         }
 
         service_lower = service_key.lower()

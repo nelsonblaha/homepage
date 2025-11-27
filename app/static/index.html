@@ -55,8 +55,8 @@
         <template x-if="view === 'friend'">
             <div class="max-w-4xl mx-auto px-4 py-12">
                 <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-blue-400 mb-2">blaha.io</h1>
-                    <p class="text-xl text-gray-300">Welcome, <span x-text="friendName" class="text-blue-300"></span></p>
+                    <h1 class="text-4xl font-bold text-blue-300 mb-2">Welcome, <span x-text="friendName"></span></h1>
+                    <p class="text-xl text-gray-400">blaha.io</p>
                 </div>
 
                 <div x-show="friendError" class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-6">
@@ -66,10 +66,10 @@
                 <!-- Grouped by stack -->
                 <template x-for="group in getGroupedServices(friendServices)" :key="group.stack">
                     <div class="mb-8">
-                        <!-- Stack header (only for stacks with 2+ services) -->
-                        <div x-show="group.services.length >= 2 && group.stack" class="flex items-center gap-2 mb-3">
+                        <!-- Stack header (for stacks with 2+ services, or "Other" for ungrouped) -->
+                        <div x-show="group.services.length >= 2 || !group.stack" class="flex items-center gap-2 mb-3">
                             <span class="text-2xl" x-text="getStackIcon(group.stack)"></span>
-                            <span class="text-lg font-semibold text-gray-400" x-text="getStackLabel(group.stack)"></span>
+                            <span class="text-lg font-semibold text-gray-400" x-text="group.stack ? getStackLabel(group.stack) : 'Other'"></span>
                         </div>
                         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="services-grid">
                             <template x-for="service in group.services" :key="service.id">
@@ -81,7 +81,7 @@
                                     <span x-show="needsManualLogin(service)"
                                           class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
                                     <span x-show="!isAutoAuth(service) && !needsManualLogin(service)"
-                                          class="absolute top-2 right-2 text-gray-400 text-sm" title="external account">🔒</span>
+                                          class="absolute top-2 right-2 text-gray-400 text-sm" title="external account needed">🔒</span>
                                     <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
                                     <div class="font-semibold" x-text="service.name"></div>
                                     <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
@@ -240,10 +240,10 @@
                 <!-- Grouped by stack -->
                 <template x-for="group in getGroupedServices(services)" :key="group.stack">
                     <div class="mb-8">
-                        <!-- Stack header (only for stacks with 2+ services) -->
-                        <div x-show="group.services.length >= 2 && group.stack" class="flex items-center gap-2 mb-3">
+                        <!-- Stack header (for stacks with 2+ services, or "Other" for ungrouped) -->
+                        <div x-show="group.services.length >= 2 || !group.stack" class="flex items-center gap-2 mb-3">
                             <span class="text-2xl" x-text="getStackIcon(group.stack)"></span>
-                            <span class="text-lg font-semibold text-gray-400" x-text="getStackLabel(group.stack)"></span>
+                            <span class="text-lg font-semibold text-gray-400" x-text="group.stack ? getStackLabel(group.stack) : 'Other'"></span>
                         </div>
                         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             <template x-for="service in group.services" :key="service.id">
@@ -420,7 +420,7 @@
                                                     <span x-text="service.name"></span>
                                                     <span x-show="isAutoAuth(service)" class="text-green-300 text-xs" title="auto-login">↗</span>
                                                     <span x-show="needsManualLogin(service)" class="text-yellow-300 text-xs" title="manual login">✏️</span>
-                                                    <span x-show="!isAutoAuth(service) && !needsManualLogin(service)" class="text-gray-300 text-xs" title="external account">🔒</span>
+                                                    <span x-show="!isAutoAuth(service) && !needsManualLogin(service)" class="text-gray-300 text-xs" title="external account needed">🔒</span>
                                                 </button>
                                             </template>
                                         </div>
@@ -489,7 +489,25 @@
                                     <tr class="border-t border-gray-700">
                                         <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
                                         <td class="px-4 py-3">
-                                            <span class="font-medium" x-text="service.name"></span>
+                                            <template x-if="editingNameId !== service.id">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-medium" x-text="service.name"></span>
+                                                    <button @click="startEditName(service)"
+                                                            class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
+                                                </div>
+                                            </template>
+                                            <template x-if="editingNameId === service.id">
+                                                <div class="flex items-center gap-2">
+                                                    <input type="text" x-model="editingName"
+                                                           @keyup.enter="saveName(service)"
+                                                           @keyup.escape="cancelEditName()"
+                                                           class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500">
+                                                    <button @click="saveName(service)"
+                                                            class="text-green-400 hover:text-green-300 text-xs">Save</button>
+                                                    <button @click="cancelEditName()"
+                                                            class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
+                                                </div>
+                                            </template>
                                         </td>
                                         <td class="px-4 py-3 text-sm max-w-xs">
                                             <template x-if="editingServiceId !== service.id">
@@ -521,7 +539,7 @@
                                         <td class="px-4 py-3 text-right space-x-2">
                                             <button @click="toggleServiceDefault(service)"
                                                     class="text-yellow-400 hover:text-yellow-300 text-sm">Remove Default</button>
-                                            <button x-show="service.subdomain" @click="copyPreauthUrl(service.id)"
+                                            <button x-show="supportsAuthUrl(service)" @click="copyPreauthUrl(service.id)"
                                                     class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
                                             <button @click="deleteService(service.id)"
                                                     class="text-red-400 hover:text-red-300 text-sm">Delete</button>
@@ -566,7 +584,25 @@
                                             <tr class="border-t border-gray-700">
                                                 <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
                                                 <td class="px-4 py-3">
-                                                    <span class="font-medium" x-text="service.name"></span>
+                                                    <template x-if="editingNameId !== service.id">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="font-medium" x-text="service.name"></span>
+                                                            <button @click="startEditName(service)"
+                                                                    class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="editingNameId === service.id">
+                                                        <div class="flex items-center gap-2">
+                                                            <input type="text" x-model="editingName"
+                                                                   @keyup.enter="saveName(service)"
+                                                                   @keyup.escape="cancelEditName()"
+                                                                   class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500">
+                                                            <button @click="saveName(service)"
+                                                                    class="text-green-400 hover:text-green-300 text-xs">Save</button>
+                                                            <button @click="cancelEditName()"
+                                                                    class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
+                                                        </div>
+                                                    </template>
                                                 </td>
                                                 <td class="px-4 py-3 text-sm max-w-xs">
                                                     <template x-if="editingServiceId !== service.id">
@@ -598,7 +634,7 @@
                                                 <td class="px-4 py-3 text-right space-x-2">
                                                     <button @click="toggleServiceDefault(service)"
                                                             class="text-green-400 hover:text-green-300 text-sm">Make Default</button>
-                                                    <button x-show="service.subdomain" @click="copyPreauthUrl(service.id)"
+                                                    <button x-show="supportsAuthUrl(service)" @click="copyPreauthUrl(service.id)"
                                                             class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
                                                     <button @click="deleteService(service.id)"
                                                             class="text-red-400 hover:text-red-300 text-sm">Delete</button>
@@ -662,6 +698,8 @@
                 nextcloudStatus: { connected: false, error: '' },
                 editingServiceId: null,
                 editingDescription: '',
+                editingNameId: null,
+                editingName: '',
                 expandedFriends: {},
                 toast: { show: false, message: '' },
 
@@ -954,10 +992,11 @@
                 needsManualLogin(service) {
                     // Services where we have stored credentials but user must enter them manually
                     const authType = service.auth_type || 'none';
-                    return authType === 'nextcloud' || authType === 'basic';
+                    return authType === 'nextcloud' || authType === 'basic' || authType === 'overseerr';
                 },
 
                 async handleServiceClick(service) {
+                    console.log('handleServiceClick:', service.name, 'auth_type:', service.auth_type, 'needsManualLogin:', this.needsManualLogin(service));
                     // For services requiring manual login with stored credentials, show modal
                     if (this.needsManualLogin(service)) {
                         await this.showCredentialsModal(service);
@@ -968,9 +1007,12 @@
                 },
 
                 async showCredentialsModal(service) {
+                    console.log('showCredentialsModal called for:', service.name);
                     this.credentialsService = service;
                     try {
-                        const resp = await fetch(`/api/f/${this.friendToken}/credentials/${service.subdomain || service.name.toLowerCase()}`);
+                        const url = `/api/f/${this.friendToken}/credentials/${service.subdomain || service.name.toLowerCase()}`;
+                        console.log('Fetching credentials from:', url);
+                        const resp = await fetch(url);
                         if (resp.ok) {
                             const data = await resp.json();
                             this.friendCredentials = { username: data.username, password: data.password };
@@ -1099,6 +1141,46 @@
                     await this.loadAdminData();
                 },
 
+                // Service name editing
+                startEditName(service) {
+                    this.editingNameId = service.id;
+                    this.editingName = service.name || '';
+                },
+
+                cancelEditName() {
+                    this.editingNameId = null;
+                    this.editingName = '';
+                },
+
+                async saveName(service) {
+                    try {
+                        const resp = await fetch(`/api/services/${service.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: this.editingName,
+                                url: service.url,
+                                icon: service.icon,
+                                description: service.description || '',
+                                display_order: service.display_order || 0,
+                                subdomain: service.subdomain || '',
+                                stack: service.stack || '',
+                                is_default: service.is_default
+                            })
+                        });
+                        if (resp.ok) {
+                            this.editingNameId = null;
+                            this.editingName = '';
+                            await this.loadAdminData();
+                        } else {
+                            const err = await resp.json();
+                            alert(`Error: ${err.detail}`);
+                        }
+                    } catch (e) {
+                        alert('Failed to save name');
+                    }
+                },
+
                 // Service description editing
                 startEditDescription(service) {
                     this.editingServiceId = service.id;
@@ -1108,6 +1190,14 @@
                 cancelEditDescription() {
                     this.editingServiceId = null;
                     this.editingDescription = '';
+                },
+
+                supportsAuthUrl(service) {
+                    // Only show "Copy Auth URL" for services where preauth actually works
+                    // basic auth via URL is blocked by browsers, so exclude it
+                    // jellyfin and ombi have API-based auth
+                    const authType = service.auth_type || 'none';
+                    return service.subdomain && (authType === 'none' || authType === 'jellyfin' || authType === 'ombi');
                 },
 
                 async saveDescription(service) {
