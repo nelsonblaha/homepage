@@ -82,6 +82,10 @@
                                           class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
                                     <span x-show="!isAutoAuth(service) && !needsManualLogin(service)"
                                           class="absolute top-2 right-2 text-gray-400 text-sm" title="external account needed">🔒</span>
+                                    <!-- Jitsi participant badge (for Video Chat service) -->
+                                    <span x-show="service.name.toLowerCase().includes('video') && jitsiParticipants > 0"
+                                          class="absolute top-2 left-2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
+                                          x-text="jitsiParticipants" :title="jitsiParticipants + ' in call'"></span>
                                     <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
                                     <div class="font-semibold" x-text="service.name"></div>
                                     <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
@@ -257,6 +261,10 @@
                                           class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
                                     <span x-show="!isAutoAuth(service) && !needsManualLogin(service)"
                                           class="absolute top-2 right-2 text-gray-400 text-sm" title="external account needed">🔒</span>
+                                    <!-- Jitsi participant badge (for Video Chat service) -->
+                                    <span x-show="service.name.toLowerCase().includes('video') && jitsiParticipants > 0"
+                                          class="absolute top-2 left-2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
+                                          x-text="jitsiParticipants" :title="jitsiParticipants + ' in call'"></span>
                                     <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
                                     <div class="font-semibold" x-text="service.name"></div>
                                     <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
@@ -716,6 +724,7 @@
                 jellyfinStatus: { connected: false, serverName: '', error: '' },
                 nextcloudStatus: { connected: false, error: '' },
                 overseerrStatus: { connected: false, error: '' },
+                jitsiParticipants: 0,
                 editingServiceId: null,
                 editingDescription: '',
                 editingNameId: null,
@@ -768,6 +777,22 @@
                         } else {
                             this.view = 'public';
                         }
+                    }
+
+                    // Start Jitsi participant polling
+                    this.fetchJitsiParticipants();
+                    setInterval(() => this.fetchJitsiParticipants(), 30000);
+                },
+
+                async fetchJitsiParticipants() {
+                    try {
+                        const resp = await fetch('/api/jitsi/participants');
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            this.jitsiParticipants = data.count || 0;
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch Jitsi participants:', e);
                     }
                 },
 
@@ -935,7 +960,7 @@
                     const classes = {
                         'media': 'bg-purple-900 text-purple-200',
                         'infra': 'bg-blue-900 text-blue-200',
-                        'jitsi': 'bg-green-900 text-green-200',
+                        'social': 'bg-green-900 text-green-200',
                         'priorities': 'bg-orange-900 text-orange-200'
                     };
                     return classes[stack] || 'bg-gray-700 text-gray-300';
@@ -945,7 +970,7 @@
                     const classes = {
                         'media': 'bg-purple-600 text-white',
                         'infra': 'bg-blue-600 text-white',
-                        'jitsi': 'bg-green-600 text-white',
+                        'social': 'bg-green-600 text-white',
                         'priorities': 'bg-orange-600 text-white'
                     };
                     return classes[stack] || 'bg-blue-600 text-white';
@@ -1367,9 +1392,8 @@
                         'media': '🎬',
                         'infra': '🔧',
                         'games': '🎮',
-                        'jitsi': '📹',
-                        'priorities': '📋',
-                        'chat': '💬'
+                        'social': '💬',
+                        'priorities': '📋'
                     };
                     return icons[stack] || '📦';
                 },
@@ -1379,9 +1403,8 @@
                         'media': 'Media',
                         'infra': 'Infrastructure',
                         'games': 'Games',
-                        'jitsi': 'Video Chat',
-                        'priorities': 'Priorities',
-                        'chat': 'Chat'
+                        'social': 'Social',
+                        'priorities': 'Priorities'
                     };
                     return labels[stack] || stack.charAt(0).toUpperCase() + stack.slice(1);
                 }
