@@ -23,9 +23,14 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Start application
+        env:
+          ADMIN_PASSWORD: testpassword
+          SESSION_SECRET: testsecret1234567890abcdef
+          DB_PATH: /tmp/test-unit.db
+          COOKIE_DOMAIN: localhost
         run: |
           cd app
-          ADMIN_PASSWORD=testpassword SESSION_SECRET=testsecret1234567890abcdef DB_PATH=/tmp/test-unit.db COOKIE_DOMAIN=localhost python -m uvicorn main:app --host 0.0.0.0 --port 5000 &
+          python -m uvicorn main:app --host 0.0.0.0 --port 5000 &
           sleep 5
 
       - name: Set up Node.js
@@ -80,10 +85,17 @@ jobs:
           fi
 
       - name: Start blaha-homepage with Ombi config
+        env:
+          ADMIN_PASSWORD: testpassword
+          SESSION_SECRET: testsecret1234567890abcdef
+          DB_PATH: /tmp/test-integration.db
+          COOKIE_DOMAIN: localhost
+          OMBI_URL: http://localhost:3579
+          OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
         run: |
           pip install -r requirements.txt
           cd app
-          ADMIN_PASSWORD=testpassword SESSION_SECRET=testsecret1234567890abcdef DB_PATH=/tmp/test-integration.db COOKIE_DOMAIN=localhost OMBI_URL=http://localhost:3579 OMBI_API_KEY=${{ steps.ombi-setup.outputs.OMBI_API_KEY }} python -m uvicorn main:app --host 0.0.0.0 --port 8100 &
+          python -m uvicorn main:app --host 0.0.0.0 --port 8100 &
           sleep 5
 
       - name: Set up Node.js
