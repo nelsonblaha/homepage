@@ -165,7 +165,11 @@ async def _auth_basic(subdomain: str) -> Response:
 
 
 async def _auth_ombi(friend: dict) -> Response:
-    """Authenticate to Ombi and redirect with JWT token."""
+    """Authenticate to Ombi and redirect to setup page on ombi.blaha.io.
+
+    The localStorage must be set on ombi.blaha.io domain, so we redirect
+    to ombi.blaha.io/blaha-auth-setup which proxies to our auth-setup endpoint.
+    """
     if not OMBI_URL:
         raise HTTPException(status_code=400, detail="Ombi not configured")
 
@@ -176,21 +180,13 @@ async def _auth_ombi(friend: dict) -> Response:
     if not access_token:
         raise HTTPException(status_code=401, detail="Ombi authentication failed")
 
-    html = f"""<!DOCTYPE html>
-<html>
-<head><title>Signing into Ombi...</title></head>
-<body style="background:#101010;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
-<div style="text-align:center">
-<h2>Signing into Ombi...</h2>
-<script>
-localStorage.setItem('id_token', '{access_token}');
-window.location.href = 'https://ombi.blaha.io/';
-</script>
-<noscript>JavaScript is required. <a href="https://ombi.blaha.io">Go to Ombi</a></noscript>
-</div>
-</body>
-</html>"""
-    return HTMLResponse(content=html)
+    from urllib.parse import urlencode
+    params = urlencode({"access_token": access_token})
+    # Redirect to ombi.blaha.io so localStorage is set on correct domain
+    return RedirectResponse(
+        url=f"https://ombi.blaha.io/blaha-auth-setup?{params}",
+        status_code=302
+    )
 
 
 async def _auth_jellyfin(friend: dict) -> Response:

@@ -91,6 +91,32 @@ async def authenticate_ombi(username: str, password: str) -> str | None:
     return None
 
 
+@router.get("/auth-setup")
+async def ombi_auth_setup(access_token: str):
+    """Serve the localStorage setup page for Ombi auto-login.
+
+    This endpoint is accessed via ombi.blaha.io/blaha-auth-setup so that
+    localStorage is set on the correct domain (ombi.blaha.io).
+    """
+    from fastapi.responses import HTMLResponse
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><title>Signing into Ombi...</title></head>
+<body style="background:#101010;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
+<div style="text-align:center">
+<h2>Signing into Ombi...</h2>
+<script>
+localStorage.setItem('id_token', '{access_token}');
+window.location.href = 'https://ombi.blaha.io/';
+</script>
+<noscript>JavaScript is required. <a href="https://ombi.blaha.io">Go to Ombi</a></noscript>
+</div>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
 @router.get("/status")
 async def ombi_status(_: bool = Depends(verify_admin)):
     """Check Ombi connection status."""
