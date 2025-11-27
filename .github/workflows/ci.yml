@@ -27,6 +27,7 @@ jobs:
           export ADMIN_PASSWORD=testpassword
           export SESSION_SECRET=testsecret1234567890abcdef
           export DB_PATH=/tmp/test-unit.db
+          export COOKIE_DOMAIN=localhost
           cd app
           python -m uvicorn main:app --host 0.0.0.0 --port 5000 &
           sleep 5
@@ -87,6 +88,7 @@ jobs:
           export ADMIN_PASSWORD=testpassword
           export SESSION_SECRET=testsecret1234567890abcdef
           export DB_PATH=/tmp/test-integration.db
+          export COOKIE_DOMAIN=localhost
           export OMBI_URL=http://localhost:3579
           export OMBI_API_KEY=${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
           pip install -r requirements.txt

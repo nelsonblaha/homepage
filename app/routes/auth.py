@@ -16,6 +16,7 @@ from integrations.jellyfin import authenticate_jellyfin, JELLYFIN_URL
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changeme")
 BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "ben")
 BASIC_AUTH_PASS = os.environ.get("BASIC_AUTH_PASS", "")
+COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", ".blaha.io")  # Use None for localhost
 
 router = APIRouter(tags=["auth"])
 
@@ -34,15 +35,17 @@ async def admin_login(login: AdminLogin, response: Response, request: Request):
     session_token, expires_at = await create_session("admin", remember=remember, user_agent=user_agent)
 
     duration = SESSION_DURATION_LONG if remember else SESSION_DURATION_SHORT
-    response.set_cookie(
-        key="admin_token",
-        value=session_token,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        max_age=int(duration.total_seconds()),
-        domain=".blaha.io"
-    )
+    cookie_kwargs = {
+        "key": "admin_token",
+        "value": session_token,
+        "httponly": True,
+        "samesite": "lax",
+        "max_age": int(duration.total_seconds()),
+    }
+    if COOKIE_DOMAIN and COOKIE_DOMAIN != "localhost":
+        cookie_kwargs["domain"] = COOKIE_DOMAIN
+        cookie_kwargs["secure"] = True
+    response.set_cookie(**cookie_kwargs)
     return {"status": "ok"}
 
 
@@ -58,7 +61,10 @@ async def verify_admin_session(admin_token: Optional[str] = Cookie(default=None)
 async def admin_logout(response: Response, admin_token: Optional[str] = Cookie(default=None)):
     if admin_token:
         await delete_session(admin_token)
-    response.delete_cookie("admin_token", domain=".blaha.io")
+    if COOKIE_DOMAIN and COOKIE_DOMAIN != "localhost":
+        response.delete_cookie("admin_token", domain=COOKIE_DOMAIN)
+    else:
+        response.delete_cookie("admin_token")
     return {"status": "ok"}
 
 
@@ -129,15 +135,17 @@ async def create_friend_session(response: Response, request: Request, token: str
             "friend", user_id=friend["id"], remember=True, user_agent=user_agent
         )
 
-        response.set_cookie(
-            key="admin_token",
-            value=session_token,
-            httponly=True,
-            secure=True,
-            samesite="lax",
-            max_age=int(SESSION_DURATION_LONG.total_seconds()),
-            domain=".blaha.io"
-        )
+        cookie_kwargs = {
+            "key": "admin_token",
+            "value": session_token,
+            "httponly": True,
+            "samesite": "lax",
+            "max_age": int(SESSION_DURATION_LONG.total_seconds()),
+        }
+        if COOKIE_DOMAIN and COOKIE_DOMAIN != "localhost":
+            cookie_kwargs["domain"] = COOKIE_DOMAIN
+            cookie_kwargs["secure"] = True
+        response.set_cookie(**cookie_kwargs)
         return {"status": "ok", "name": friend["name"]}
 
 

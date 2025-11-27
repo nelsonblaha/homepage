@@ -9,12 +9,16 @@ describe('Service Management', () => {
   })
 
   it('should show add service form', () => {
-    cy.get('[data-testid="add-service-btn"]').click()
-    cy.get('[data-testid="service-form"]').should('be.visible')
+    // The add service form is always visible at the bottom of the services panel
+    cy.get('[data-testid="services-panel"]').within(() => {
+      cy.contains('Add Service').should('be.visible')
+      cy.get('input[placeholder="Service name"]').should('be.visible')
+    })
   })
 
   it('should load integration status', () => {
-    // Check that integration status section exists
+    // Integration status is on the friends tab
+    cy.get('[data-testid="tab-friends"]').click()
     cy.get('[data-testid="integrations"]').should('exist')
   })
 })

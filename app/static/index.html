@@ -31,7 +31,7 @@
                                    class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
                             Remember me
                         </label>
-                        <div x-show="loginError" class="text-red-400 text-sm mb-3" x-text="loginError"></div>
+                        <div x-show="loginError" class="text-red-400 text-sm mb-3" x-text="loginError" data-testid="error"></div>
                         <button type="submit"
                                 class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
                             Login
@@ -147,7 +147,7 @@
                                    class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
                             Remember me for 30 days
                         </label>
-                        <div x-show="loginError" class="text-red-400 text-sm mb-4" x-text="loginError"></div>
+                        <div x-show="loginError" class="text-red-400 text-sm mb-4" x-text="loginError" data-testid="error"></div>
                         <button type="submit"
                                 class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
                             Login
@@ -162,7 +162,7 @@
             <div class="max-w-6xl mx-auto px-4 py-8">
                 <div class="flex justify-between items-center mb-8">
                     <h1 class="text-3xl font-bold text-blue-400">blaha.io Admin</h1>
-                    <button @click="adminLogout" class="text-gray-400 hover:text-white">Logout</button>
+                    <button @click="adminLogout" class="text-gray-400 hover:text-white" data-testid="logout-btn">Logout</button>
                 </div>
 
                 <!-- TABS -->
@@ -184,7 +184,7 @@
                 </div>
 
                 <!-- FRIENDS TAB -->
-                <div x-show="adminTab === 'friends'">
+                <div x-show="adminTab === 'friends'" data-testid="friends-panel">
                     <!-- Integration Status Bar -->
                     <div class="bg-gray-800 rounded-lg p-4 mb-6" data-testid="integrations">
                         <div class="flex items-center justify-between mb-2">
@@ -331,7 +331,7 @@
                 </div>
 
                 <!-- SERVICES TAB -->
-                <div x-show="adminTab === 'services'" x-data="{ showOtherServices: false }">
+                <div x-show="adminTab === 'services'" x-data="{ showOtherServices: false }" data-testid="services-panel">
                     <!-- Default Services List -->
                     <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
                         <div class="bg-gray-700 px-4 py-3 flex items-center justify-between">
