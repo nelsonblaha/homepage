@@ -194,7 +194,11 @@ window.location.href = 'https://ombi.blaha.io/';
 
 
 async def _auth_jellyfin(friend: dict) -> Response:
-    """Authenticate to Jellyfin and redirect with localStorage setup."""
+    """Authenticate to Jellyfin and redirect to setup page on jellyfin.blaha.io.
+
+    The localStorage must be set on jellyfin.blaha.io domain, so we redirect
+    to jellyfin.blaha.io/blaha-auth-setup which proxies to our auth-setup endpoint.
+    """
     if not JELLYFIN_URL:
         raise HTTPException(status_code=400, detail="Jellyfin not configured")
 
@@ -205,36 +209,17 @@ async def _auth_jellyfin(friend: dict) -> Response:
     if not auth_data:
         raise HTTPException(status_code=401, detail="Jellyfin authentication failed")
 
-    access_token = auth_data["access_token"]
-    user_id = auth_data["user_id"]
-    server_id = auth_data["server_id"]
-
-    html = f"""<!DOCTYPE html>
-<html>
-<head><title>Signing into Jellyfin...</title></head>
-<body style="background:#101010;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
-<div style="text-align:center">
-<h2>Signing into Jellyfin...</h2>
-<script>
-const credentials = {{
-    Servers: [{{
-        Id: "{server_id}",
-        Name: "Jellyfin",
-        LocalAddress: "{JELLYFIN_URL}",
-        ManualAddress: "https://jellyfin.blaha.io",
-        AccessToken: "{access_token}",
-        UserId: "{user_id}",
-        DateLastAccessed: Date.now()
-    }}]
-}};
-localStorage.setItem('jellyfin_credentials', JSON.stringify(credentials));
-window.location.href = 'https://jellyfin.blaha.io/web/index.html#!/home.html';
-</script>
-<noscript>JavaScript is required. <a href="https://jellyfin.blaha.io">Go to Jellyfin</a></noscript>
-</div>
-</body>
-</html>"""
-    return HTMLResponse(content=html)
+    from urllib.parse import urlencode
+    params = urlencode({
+        "access_token": auth_data["access_token"],
+        "user_id": auth_data["user_id"],
+        "server_id": auth_data["server_id"]
+    })
+    # Redirect to jellyfin.blaha.io so localStorage is set on correct domain
+    return RedirectResponse(
+        url=f"https://jellyfin.blaha.io/blaha-auth-setup?{params}",
+        status_code=302
+    )
 
 
 @router.get("/auth/{subdomain}")

@@ -91,6 +91,47 @@ async def authenticate_jellyfin(username: str, password: str) -> dict | None:
     return None
 
 
+@router.get("/auth-setup")
+async def jellyfin_auth_setup(
+    access_token: str,
+    user_id: str,
+    server_id: str
+):
+    """Serve the localStorage setup page for Jellyfin auto-login.
+
+    This endpoint is accessed via jellyfin.blaha.io/blaha-auth-setup so that
+    localStorage is set on the correct domain (jellyfin.blaha.io).
+    """
+    from fastapi.responses import HTMLResponse
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><title>Signing into Jellyfin...</title></head>
+<body style="background:#101010;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
+<div style="text-align:center">
+<h2>Signing into Jellyfin...</h2>
+<script>
+const credentials = {{
+    Servers: [{{
+        Id: "{server_id}",
+        Name: "Jellyfin",
+        LocalAddress: "{JELLYFIN_URL}",
+        ManualAddress: "https://jellyfin.blaha.io",
+        AccessToken: "{access_token}",
+        UserId: "{user_id}",
+        DateLastAccessed: Date.now()
+    }}]
+}};
+localStorage.setItem('jellyfin_credentials', JSON.stringify(credentials));
+window.location.href = 'https://jellyfin.blaha.io/web/index.html#!/home.html';
+</script>
+<noscript>JavaScript is required. <a href="https://jellyfin.blaha.io">Go to Jellyfin</a></noscript>
+</div>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
 @router.get("/status")
 async def jellyfin_status(_: bool = Depends(verify_admin)):
     """Check Jellyfin connection status."""
