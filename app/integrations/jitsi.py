@@ -18,7 +18,7 @@ async def get_jitsi_participants():
             if resp.status_code == 200:
                 data = resp.json()
                 return {
-                    "count": data.get("total_participants", 0),
+                    "count": data.get("participants", 0),  # Current live count
                     "conferences": data.get("conferences", 0)
                 }
     except Exception as e:
