@@ -75,12 +75,12 @@
                             <template x-for="service in group.services" :key="service.id">
                                 <div @click="handleServiceClick(service)"
                                      class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative cursor-pointer">
-                                    <!-- Auth indicator -->
+                                    <!-- Auth indicator (only show for known auth types) -->
                                     <span x-show="isAutoAuth(service)"
                                           class="absolute top-2 right-2 text-green-400 text-sm" title="auto-login">↗</span>
                                     <span x-show="needsManualLogin(service)"
                                           class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
-                                    <span x-show="!isAutoAuth(service) && !needsManualLogin(service)"
+                                    <span x-show="hasKnownAuthType(service) && !isAutoAuth(service) && !needsManualLogin(service)"
                                           class="absolute top-2 right-2 text-gray-400 text-sm" title="external account needed">🔒</span>
                                     <!-- Jitsi participant badge (for Video Chat service) -->
                                     <span x-show="service.name.toLowerCase().includes('video') && jitsiParticipants > 0"
@@ -254,12 +254,12 @@
                                 <a :href="service.url"
                                    target="_blank"
                                    class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative">
-                                    <!-- Auth indicator -->
+                                    <!-- Auth indicator (only show for known auth types) -->
                                     <span x-show="isAutoAuth(service)"
                                           class="absolute top-2 right-2 text-green-400 text-sm" title="auto-login">↗</span>
                                     <span x-show="needsManualLogin(service)"
                                           class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
-                                    <span x-show="!isAutoAuth(service) && !needsManualLogin(service)"
+                                    <span x-show="hasKnownAuthType(service) && !isAutoAuth(service) && !needsManualLogin(service)"
                                           class="absolute top-2 right-2 text-gray-400 text-sm" title="external account needed">🔒</span>
                                     <!-- Jitsi participant badge (for Video Chat service) -->
                                     <span x-show="service.name.toLowerCase().includes('video') && jitsiParticipants > 0"
@@ -447,7 +447,7 @@
                                                     <span x-text="service.name"></span>
                                                     <span x-show="isAutoAuth(service)" class="text-green-300 text-xs" title="auto-login">↗</span>
                                                     <span x-show="needsManualLogin(service)" class="text-yellow-300 text-xs" title="manual login">✏️</span>
-                                                    <span x-show="!isAutoAuth(service) && !needsManualLogin(service)" class="text-gray-300 text-xs" title="external account needed">🔒</span>
+                                                    <span x-show="hasKnownAuthType(service) && !isAutoAuth(service) && !needsManualLogin(service)" class="text-gray-300 text-xs" title="external account needed">🔒</span>
                                                 </button>
                                             </template>
                                         </div>
@@ -1037,17 +1037,31 @@
 
                 isAutoAuth(service) {
                     // Determines if a service auto-authenticates (no user intervention needed)
-                    // Only services where we create accounts and auto-login via /auth/{subdomain}
-                    const authType = service.auth_type || 'none';
+                    // Includes: auto-login services AND services that bypass basic auth (open access)
+                    const authType = service.auth_type || '';
 
-                    // These auth types have actual auto-login implementations
-                    return authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr';
+                    // Auto-login implementations
+                    if (authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr') {
+                        return true;
+                    }
+                    // Services that bypass basic auth - accessible without login (video chat, freeciv, etc)
+                    if (authType === 'forward-auth' || authType === 'open') {
+                        return true;
+                    }
+                    return false;
                 },
 
                 needsManualLogin(service) {
                     // Services where we have stored credentials but user must enter them manually
-                    const authType = service.auth_type || 'none';
-                    return authType === 'nextcloud' || authType === 'basic';
+                    const authType = service.auth_type || '';
+                    return authType === 'nextcloud' || authType === 'mattermost' || authType === 'basic';
+                },
+
+                hasKnownAuthType(service) {
+                    // Check if service has a known auth type (for showing/hiding icons)
+                    const authType = service.auth_type || '';
+                    const knownTypes = ['jellyfin', 'ombi', 'overseerr', 'forward-auth', 'open', 'nextcloud', 'mattermost', 'basic', 'plex'];
+                    return knownTypes.includes(authType);
                 },
 
                 async handleServiceClick(service) {

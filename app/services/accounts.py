@@ -4,6 +4,7 @@ from integrations.ombi import create_ombi_user, delete_ombi_user
 from integrations.jellyfin import create_jellyfin_user, delete_jellyfin_user
 from integrations.nextcloud import create_nextcloud_user, delete_nextcloud_user
 from integrations.overseerr import create_overseerr_user, delete_overseerr_user
+from integrations.mattermost import create_mattermost_user, delete_mattermost_user
 
 # Service names that trigger auto-account creation (case-insensitive match)
 # Plex removed - users need plex.tv accounts, we just skip basic auth for them
@@ -11,7 +12,9 @@ MANAGED_SERVICES = {
     "ombi": "ombi_user_id",
     "jellyfin": "jellyfin_user_id",
     "nextcloud": "nextcloud_user_id",
-    "overseerr": "overseerr_user_id"
+    "overseerr": "overseerr_user_id",
+    "mattermost": "mattermost_user_id",
+    "chat": "mattermost_user_id"
 }
 
 
@@ -80,6 +83,18 @@ async def handle_service_grant(friend_id: int, friend_name: str, service_name: s
         else:
             result["error"] = "Failed to create Overseerr user"
 
+    elif service_lower in ("mattermost", "chat"):
+        mm_result = await create_mattermost_user(friend_name)
+        if mm_result:
+            await db.execute(
+                "UPDATE friends SET mattermost_user_id = ?, mattermost_password = ? WHERE id = ?",
+                (str(mm_result["id"]), mm_result.get("password", ""), friend_id)
+            )
+            result["action"] = "created"
+            result["success"] = True
+        else:
+            result["error"] = "Failed to create Mattermost user"
+
     return result
 
 
@@ -90,7 +105,7 @@ async def handle_service_revoke(friend_id: int, service_name: str, db) -> dict:
 
     # Get current user IDs
     cursor = await db.execute(
-        "SELECT plex_user_id, ombi_user_id, jellyfin_user_id, nextcloud_user_id, overseerr_user_id FROM friends WHERE id = ?",
+        "SELECT plex_user_id, ombi_user_id, jellyfin_user_id, nextcloud_user_id, overseerr_user_id, mattermost_user_id FROM friends WHERE id = ?",
         (friend_id,)
     )
     friend = await cursor.fetchone()
@@ -151,5 +166,16 @@ async def handle_service_revoke(friend_id: int, service_name: str, db) -> dict:
             result["success"] = True
         else:
             result["error"] = "Failed to delete Overseerr user"
+
+    elif service_lower in ("mattermost", "chat") and friend[5]:
+        if await delete_mattermost_user(friend[5]):
+            await db.execute(
+                "UPDATE friends SET mattermost_user_id = '', mattermost_password = '' WHERE id = ?",
+                (friend_id,)
+            )
+            result["action"] = "deleted"
+            result["success"] = True
+        else:
+            result["error"] = "Failed to delete Mattermost user"
 
     return result

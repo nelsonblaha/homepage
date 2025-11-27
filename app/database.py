@@ -81,6 +81,36 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # Migration: Add nextcloud columns to friends
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN nextcloud_user_id TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN nextcloud_password TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
+        # Migration: Add overseerr columns to friends
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN overseerr_user_id TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN overseerr_password TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
+        # Migration: Add mattermost columns to friends
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN mattermost_user_id TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN mattermost_password TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
         # Sessions table for persistent auth
         await db.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
