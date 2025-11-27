@@ -1025,6 +1025,12 @@
                     if (service.subdomain && (authType === 'jellyfin' || authType === 'ombi' || authType === 'basic' || authType === 'overseerr')) {
                         return `/auth/${service.subdomain}`;
                     }
+                    // For Jitsi/Video Chat, append friend's name as display name
+                    if (service.name.toLowerCase().includes('video') && this.friendName) {
+                        const url = new URL(service.url);
+                        url.hash = `userInfo.displayName="${encodeURIComponent(this.friendName)}"`;
+                        return url.toString();
+                    }
                     // For forward auth (none) and manual login services, use URL directly
                     return service.url;
                 },
