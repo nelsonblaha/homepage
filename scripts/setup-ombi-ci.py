@@ -11,8 +11,8 @@ import sys
 import os
 
 OMBI_URL = os.environ.get('OMBI_URL', 'http://localhost:3579')
-MAX_RETRIES = 30
-RETRY_DELAY = 5
+MAX_RETRIES = 60  # Ombi takes a long time on first run
+RETRY_DELAY = 5   # 60 * 5 = 5 minutes max wait
 
 
 def wait_for_ombi():
