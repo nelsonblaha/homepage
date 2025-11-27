@@ -32,7 +32,22 @@ async def create_ombi_user(username: str) -> dict | None:
             )
             if resp.status_code in (200, 201):
                 data = resp.json()
-                return {"id": data.get("id"), "username": username, "password": password}
+                # Ombi API doesn't return ID on creation, need to fetch it
+                user_id = data.get("id")
+                if not user_id:
+                    # Look up user by name to get ID
+                    users_resp = await client.get(
+                        f"{OMBI_URL}/api/v1/Identity/Users",
+                        headers={"ApiKey": OMBI_API_KEY},
+                        timeout=10.0
+                    )
+                    if users_resp.status_code == 200:
+                        users = users_resp.json()
+                        for user in users:
+                            if user.get("userName") == username:
+                                user_id = user.get("id")
+                                break
+                return {"id": user_id, "username": username, "password": password}
             print(f"Ombi create user failed: {resp.status_code} {resp.text}")
     except Exception as e:
         print(f"Ombi error: {e}")
