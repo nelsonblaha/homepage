@@ -72,6 +72,67 @@ async def delete_overseerr_user(user_id: str) -> bool:
     return False
 
 
+async def authenticate_overseerr(email: str, password: str) -> dict | None:
+    """Authenticate to Overseerr and return session cookie."""
+    if not OVERSEERR_URL:
+        return None
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{OVERSEERR_URL}/api/v1/auth/local",
+                json={"email": email, "password": password},
+                timeout=10.0
+            )
+            if resp.status_code == 200:
+                # Get the session cookie from response
+                cookies = resp.cookies
+                return {
+                    "success": True,
+                    "cookies": dict(cookies)
+                }
+    except Exception as e:
+        print(f"Overseerr auth error: {e}")
+    return None
+
+
+@router.get("/auth-setup")
+async def overseerr_auth_setup(email: str, password: str):
+    """Proxy login to Overseerr and set session cookie.
+
+    This endpoint should be accessed via overseerr.blaha.io/blaha-auth-setup
+    so the cookie is set on the correct domain.
+    """
+    from fastapi.responses import Response, RedirectResponse
+
+    if not OVERSEERR_URL:
+        return Response(content="Overseerr not configured", status_code=500)
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{OVERSEERR_URL}/api/v1/auth/local",
+                json={"email": email, "password": password},
+                timeout=10.0
+            )
+            if resp.status_code == 200:
+                # Create redirect response and copy cookies
+                redirect = RedirectResponse(url="https://overseerr.blaha.io", status_code=302)
+                for cookie_name, cookie_value in resp.cookies.items():
+                    redirect.set_cookie(
+                        key=cookie_name,
+                        value=cookie_value,
+                        domain=".blaha.io",
+                        httponly=True,
+                        secure=True,
+                        samesite="lax"
+                    )
+                return redirect
+            else:
+                return Response(content=f"Auth failed: {resp.status_code}", status_code=401)
+    except Exception as e:
+        return Response(content=f"Error: {e}", status_code=500)
+
+
 @router.get("/status")
 async def overseerr_status(_: bool = Depends(verify_admin)):
     """Check Overseerr connection status."""

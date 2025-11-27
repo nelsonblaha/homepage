@@ -10,6 +10,7 @@ from services.session import verify_admin
 NEXTCLOUD_URL = os.environ.get("NEXTCLOUD_URL", "")
 NEXTCLOUD_ADMIN_USER = os.environ.get("NEXTCLOUD_ADMIN_USER", "admin")
 NEXTCLOUD_ADMIN_PASS = os.environ.get("NEXTCLOUD_ADMIN_PASS", "")
+NEXTCLOUD_HOST = os.environ.get("NEXTCLOUD_HOST", "nextcloud.blaha.io")
 
 # Skip SSL verification for self-signed certs
 SSL_CONTEXT = ssl.create_default_context()
@@ -32,7 +33,8 @@ async def create_nextcloud_user(username: str) -> dict | None:
                 auth=(NEXTCLOUD_ADMIN_USER, NEXTCLOUD_ADMIN_PASS),
                 headers={
                     "OCS-APIRequest": "true",
-                    "Content-Type": "application/x-www-form-urlencoded"
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Host": NEXTCLOUD_HOST
                 },
                 data={
                     "userid": username,
@@ -68,7 +70,7 @@ async def delete_nextcloud_user(user_id: str) -> bool:
             resp = await client.delete(
                 f"{NEXTCLOUD_URL}/ocs/v1.php/cloud/users/{user_id}",
                 auth=(NEXTCLOUD_ADMIN_USER, NEXTCLOUD_ADMIN_PASS),
-                headers={"OCS-APIRequest": "true"},
+                headers={"OCS-APIRequest": "true", "Host": NEXTCLOUD_HOST},
                 timeout=10.0
             )
             if resp.status_code == 200:
@@ -91,7 +93,7 @@ async def authenticate_nextcloud(username: str, password: str) -> dict | None:
             resp = await client.get(
                 f"{NEXTCLOUD_URL}/ocs/v1.php/cloud/capabilities",
                 auth=(username, password),
-                headers={"OCS-APIRequest": "true"},
+                headers={"OCS-APIRequest": "true", "Host": NEXTCLOUD_HOST},
                 timeout=10.0
             )
             if resp.status_code == 200:
@@ -164,7 +166,7 @@ async def nextcloud_status(_: bool = Depends(verify_admin)):
             resp = await client.get(
                 f"{NEXTCLOUD_URL}/ocs/v1.php/cloud/capabilities",
                 auth=(NEXTCLOUD_ADMIN_USER, NEXTCLOUD_ADMIN_PASS),
-                headers={"OCS-APIRequest": "true"},
+                headers={"OCS-APIRequest": "true", "Host": NEXTCLOUD_HOST},
                 timeout=5.0
             )
             if resp.status_code == 200:

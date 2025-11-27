@@ -53,9 +53,7 @@ jobs:
         run: pkill -f "uvicorn main:app" || true
 
   # Integration tests with real containers (Ombi, Jellyfin)
-  # Currently disabled - complex to run on production server
   integration-tests:
-    if: false  # Disabled until we have isolated CI environment
     runs-on: self-hosted
     needs: unit-tests
 
@@ -126,7 +124,7 @@ jobs:
           pkill -f "uvicorn main:app" || true
 
   deploy:
-    needs: [unit-tests]  # Skip integration-tests for now - complex to run on prod server
+    needs: [unit-tests, integration-tests]
     runs-on: self-hosted
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 

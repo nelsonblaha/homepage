@@ -7,7 +7,9 @@ A personal homepage for managing and sharing access to self-hosted services with
 - **Public Landing Page** - Clean homepage showing your services
 - **Friend Tokens** - Generate unique URLs for friends with personalized service access
 - **Admin Panel** - Manage services, friends, and access requests
-- **Auto-Account Integration** - Automatically create/delete accounts in Plex, Ombi, and Jellyfin when granting/revoking service access
+- **Auto-Account Integration** - Automatically create/delete accounts in Plex, Ombi, Jellyfin, Nextcloud, and Overseerr when granting/revoking service access
+- **Auto-Login** - Friends are automatically logged into Ombi, Jellyfin, and Overseerr when clicking service links
+- **Stack Grouping** - Services grouped by category (Media, Infrastructure, etc.) in the UI
 - **SQLite Database** - Simple, file-based persistence
 - **Alpine.js + Tailwind CSS** - Modern, lightweight frontend
 - **FastAPI Backend** - Fast, async Python API
@@ -54,6 +56,15 @@ OMBI_API_KEY=your-ombi-api-key    # From: Ombi Settings > Configuration > Genera
 # Optional: Jellyfin Integration
 JELLYFIN_URL=http://172.17.0.1:8096
 JELLYFIN_API_KEY=your-jellyfin-key  # From: Dashboard > API Keys
+
+# Optional: Nextcloud Integration
+NEXTCLOUD_URL=https://172.17.0.1:8086
+NEXTCLOUD_ADMIN_USER=admin
+NEXTCLOUD_ADMIN_PASS=your-admin-password
+
+# Optional: Overseerr Integration
+OVERSEERR_URL=http://172.17.0.1:5056
+OVERSEERR_API_KEY=your-overseerr-key  # From: Settings > General
 ```
 
 ## Auto-Account Integration
@@ -71,14 +82,27 @@ When enabled, the app automatically creates and manages user accounts in integra
 
 ### Jellyfin
 - Creates local Jellyfin users
+- Auto-login via localStorage token injection
 - Get API key from Jellyfin: Dashboard > Administration > API Keys
+
+### Nextcloud
+- Creates local Nextcloud users via OCS API
+- Users receive credentials in a modal to copy/paste
+- Requires admin credentials with user management permissions
+
+### Overseerr
+- Creates local Overseerr users with REQUEST permission
+- Auto-login via session cookie
+- Requires email notifications to be enabled in Overseerr settings
+- Get API key from Overseerr: Settings > General
 
 ### How It Works
 
-1. Add a service named "Plex", "Ombi", or "Jellyfin" (case-insensitive)
+1. Add a service named "Plex", "Ombi", "Jellyfin", "Nextcloud", or "Overseerr" (case-insensitive)
 2. When you grant that service to a friend, an account is automatically created
 3. When you revoke access, the account is automatically deleted
 4. Deleting a friend removes all their accounts
+5. For auto-login services (Ombi, Jellyfin, Overseerr), clicking the service link auto-authenticates the user
 
 ## Nginx Reverse Proxy Setup
 
@@ -177,6 +201,11 @@ blaha-homepage/
 - `GET /api/plex/status` - Check Plex connection
 - `GET /api/ombi/status` - Check Ombi connection
 - `GET /api/jellyfin/status` - Check Jellyfin connection
+- `GET /api/nextcloud/status` - Check Nextcloud connection
+- `GET /api/overseerr/status` - Check Overseerr connection
+
+### Authentication
+- `GET /auth/{subdomain}` - Unified auth redirect for friends (handles auto-login)
 
 ## License
 

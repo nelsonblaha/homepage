@@ -12,6 +12,7 @@ from services.session import (
 )
 from integrations.ombi import authenticate_ombi, OMBI_URL
 from integrations.jellyfin import authenticate_jellyfin, JELLYFIN_URL
+from integrations.overseerr import OVERSEERR_URL
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changeme")
 BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "ben")
@@ -218,6 +219,32 @@ async def _auth_jellyfin(friend: dict) -> Response:
     )
 
 
+async def _auth_overseerr(friend: dict) -> Response:
+    """Authenticate to Overseerr and redirect to setup page on overseerr.blaha.io.
+
+    Overseerr uses session cookies, so we redirect to overseerr.blaha.io/blaha-auth-setup
+    which proxies to our auth-setup endpoint that handles login and sets cookies.
+    """
+    if not OVERSEERR_URL:
+        raise HTTPException(status_code=400, detail="Overseerr not configured")
+
+    if not friend.get("overseerr_user_id") or not friend.get("overseerr_password"):
+        raise HTTPException(status_code=403, detail="No Overseerr account configured")
+
+    from urllib.parse import urlencode
+    # Email format matches what we create in overseerr.py
+    email = f"{friend['name'].lower().replace(' ', '')}@blaha.io"
+    params = urlencode({
+        "email": email,
+        "password": friend["overseerr_password"]
+    })
+    # Redirect to overseerr.blaha.io so cookies are set on correct domain
+    return RedirectResponse(
+        url=f"https://overseerr.blaha.io/blaha-auth-setup?{params}",
+        status_code=302
+    )
+
+
 @router.get("/auth/{subdomain}")
 async def unified_auth_redirect(subdomain: str, admin_token: Optional[str] = Cookie(default=None)):
     """Unified auth endpoint for friends accessing services."""
@@ -261,6 +288,8 @@ async def unified_auth_redirect(subdomain: str, admin_token: Optional[str] = Coo
             return await _auth_jellyfin(friend)
         elif auth_type == "ombi":
             return await _auth_ombi(friend)
+        elif auth_type == "overseerr":
+            return await _auth_overseerr(friend)
         else:
             return RedirectResponse(url=f"https://{subdomain}.blaha.io/", status_code=302)
 

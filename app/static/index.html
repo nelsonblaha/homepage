@@ -350,8 +350,19 @@
                                     <span class="text-yellow-400" x-text="nextcloudStatus.error || 'Not configured'"></span>
                                 </template>
                             </div>
+                            <!-- Overseerr Status -->
+                            <div class="flex items-center gap-2">
+                                <span>🎫</span>
+                                <span class="text-gray-400">Overseerr:</span>
+                                <template x-if="overseerrStatus.connected">
+                                    <span class="text-green-400">Connected</span>
+                                </template>
+                                <template x-if="!overseerrStatus.connected">
+                                    <span class="text-yellow-400" x-text="overseerrStatus.error || 'Not configured'"></span>
+                                </template>
+                            </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">Accounts are automatically created/deleted when granting/revoking Plex, Ombi, Jellyfin, or Nextcloud services.</p>
+                        <p class="text-xs text-gray-500 mt-2">Accounts are automatically created/deleted when granting/revoking Plex, Ombi, Jellyfin, Nextcloud, or Overseerr services.</p>
                     </div>
 
                     <!-- Add Friend Form -->
@@ -410,6 +421,7 @@
                                                 <span x-show="friend.ombi_user_id" class="text-green-400">🎬 Ombi</span>
                                                 <span x-show="friend.jellyfin_user_id" class="text-green-400">🎞️ Jellyfin</span>
                                                 <span x-show="friend.nextcloud_user_id" class="text-green-400">☁️ Nextcloud</span>
+                                                <span x-show="friend.overseerr_user_id" class="text-green-400">🎫 Overseerr</span>
                                             </div>
                                         </div>
                                         <button @click.stop="deleteFriend(friend.id)"
@@ -703,6 +715,7 @@
                 ombiStatus: { connected: false, error: '' },
                 jellyfinStatus: { connected: false, serverName: '', error: '' },
                 nextcloudStatus: { connected: false, error: '' },
+                overseerrStatus: { connected: false, error: '' },
                 editingServiceId: null,
                 editingDescription: '',
                 editingNameId: null,
@@ -805,7 +818,8 @@
                         this.checkPlexStatus(),
                         this.checkOmbiStatus(),
                         this.checkJellyfinStatus(),
-                        this.checkNextcloudStatus()
+                        this.checkNextcloudStatus(),
+                        this.checkOverseerrStatus()
                     ]);
                 },
 
@@ -842,6 +856,15 @@
                         this.nextcloudStatus = await resp.json();
                     } catch (e) {
                         this.nextcloudStatus = { connected: false, error: 'Failed to check' };
+                    }
+                },
+
+                async checkOverseerrStatus() {
+                    try {
+                        const resp = await fetch('/api/overseerr/status');
+                        this.overseerrStatus = await resp.json();
+                    } catch (e) {
+                        this.overseerrStatus = { connected: false, error: 'Failed to check' };
                     }
                 },
 
@@ -972,9 +995,9 @@
 
                 getServiceUrl(service) {
                     // Route services through auth endpoint only if they need special auth handling
-                    // jellyfin/ombi need API auth, basic needs preauth
+                    // jellyfin/ombi/overseerr need API auth, basic needs preauth
                     const authType = service.auth_type || 'none';
-                    if (service.subdomain && (authType === 'jellyfin' || authType === 'ombi' || authType === 'basic')) {
+                    if (service.subdomain && (authType === 'jellyfin' || authType === 'ombi' || authType === 'basic' || authType === 'overseerr')) {
                         return `/auth/${service.subdomain}`;
                     }
                     // For forward auth (none) and manual login services, use URL directly
@@ -989,7 +1012,7 @@
                     const authType = service.auth_type || 'none';
 
                     // These auth types handle login automatically
-                    if (authType === 'jellyfin' || authType === 'ombi') return true;
+                    if (authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr') return true;
 
                     // 'none' with subdomain = forward auth (auto)
                     if (authType === 'none' && service.subdomain) return true;
@@ -1001,7 +1024,7 @@
                 needsManualLogin(service) {
                     // Services where we have stored credentials but user must enter them manually
                     const authType = service.auth_type || 'none';
-                    return authType === 'nextcloud' || authType === 'basic' || authType === 'overseerr';
+                    return authType === 'nextcloud' || authType === 'basic';
                 },
 
                 async handleServiceClick(service) {
@@ -1257,23 +1280,41 @@
                     // Convert to array, only showing header for stacks with 2+ services
                     const result = [];
 
-                    // Add stacks with 2+ services first (with headers)
-                    Object.keys(groups).sort().forEach(stack => {
+                    // Sort stacks: alphabetically but exclude 'infra' (added at very end)
+                    const sortedStacks = Object.keys(groups)
+                        .filter(s => s !== 'infra')
+                        .sort();
+
+                    // Add stacks with 2+ services (with headers)
+                    sortedStacks.forEach(stack => {
                         if (groups[stack].length >= 2) {
                             result.push({ stack, services: groups[stack] });
                         }
                     });
 
-                    // Combine single-item stacks and no-stack items into ungrouped
+                    // Combine single-item stacks (except infra) and no-stack items into ungrouped "Other"
                     const ungrouped = [...noStack];
                     Object.keys(groups).forEach(stack => {
-                        if (groups[stack].length < 2) {
+                        if (stack !== 'infra' && groups[stack].length < 2) {
                             ungrouped.push(...groups[stack]);
                         }
                     });
 
                     if (ungrouped.length > 0) {
                         result.push({ stack: '', services: ungrouped });
+                    }
+
+                    // Add Infrastructure last (if 2+ services)
+                    if (groups['infra'] && groups['infra'].length >= 2) {
+                        result.push({ stack: 'infra', services: groups['infra'] });
+                    } else if (groups['infra']) {
+                        // Single infra item goes to Other - find and add to it
+                        const otherGroup = result.find(g => g.stack === '');
+                        if (otherGroup) {
+                            otherGroup.services.push(...groups['infra']);
+                        } else {
+                            result.push({ stack: '', services: groups['infra'] });
+                        }
                     }
 
                     return result;
@@ -1298,14 +1339,24 @@
                     // Convert to array - each stack gets its own section
                     const result = [];
 
-                    // Add stacks in alphabetical order
-                    Object.keys(groups).sort().forEach(stack => {
+                    // Sort stacks: alphabetically but exclude 'infra' (added at very end)
+                    const sortedStacks = Object.keys(groups)
+                        .filter(s => s !== 'infra')
+                        .sort();
+
+                    // Add stacks (except infra)
+                    sortedStacks.forEach(stack => {
                         result.push({ stack, services: groups[stack] });
                     });
 
-                    // Add "Other" (no stack) at the end if any
+                    // Add "Other" (no stack)
                     if (noStack.length > 0) {
                         result.push({ stack: '', services: noStack });
+                    }
+
+                    // Add Infrastructure last
+                    if (groups['infra']) {
+                        result.push({ stack: 'infra', services: groups['infra'] });
                     }
 
                     return result;
