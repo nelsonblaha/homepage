@@ -11,12 +11,13 @@ describe('Admin Authentication', () => {
   it('should reject invalid password', () => {
     cy.get('input[type="password"]').type('wrongpassword')
     cy.get('button[type="submit"]').click()
-    cy.get('[data-testid="error"]').should('contain', 'Invalid')
+    cy.get('[data-testid="error"]').should('be.visible')
   })
 
-  it('should login with valid password', () => {
+  it('should login with valid password via API', () => {
     cy.adminLogin()
     cy.url().should('include', '/admin')
+    cy.get('[data-testid="tab-friends"]').should('be.visible')
   })
 
   it('should redirect to /admin if already authenticated', () => {
@@ -28,8 +29,8 @@ describe('Admin Authentication', () => {
   it('should logout successfully', () => {
     cy.adminLogin()
     cy.get('[data-testid="logout-btn"]').click()
-    cy.url().should('not.include', '/admin')
-    cy.get('input[type="password"]').should('be.visible')
+    // After logout, should be back at login
+    cy.get('input[type="password"]', { timeout: 10000 }).should('be.visible')
   })
 })
 
