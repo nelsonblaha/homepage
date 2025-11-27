@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>blaha.io</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <div x-data="app()" x-init="init()" x-cloak>
+        <!-- PUBLIC LANDING -->
+        <template x-if="view === 'public'">
+            <div class="flex flex-col items-center justify-center min-h-screen">
+                <h1 class="text-6xl font-bold text-blue-400 mb-4">blaha.io</h1>
+                <p class="text-gray-500 text-sm">Private services</p>
+            </div>
+        </template>
+
+        <!-- FRIEND VIEW -->
+        <template x-if="view === 'friend'">
+            <div class="max-w-4xl mx-auto px-4 py-12">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl font-bold text-blue-400 mb-2">blaha.io</h1>
+                    <p class="text-xl text-gray-300">Welcome, <span x-text="friendName" class="text-blue-300"></span></p>
+                </div>
+
+                <div x-show="friendError" class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-6">
+                    <span x-text="friendError"></span>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <template x-for="service in friendServices" :key="service.id">
+                        <a :href="service.url" target="_blank"
+                           class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500">
+                            <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
+                            <div class="font-semibold" x-text="service.name"></div>
+                            <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
+                        </a>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- REQUEST ACCESS -->
+        <template x-if="view === 'request-access'">
+            <div class="flex flex-col items-center justify-center min-h-screen px-4">
+                <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md text-center">
+                    <h1 class="text-3xl font-bold text-blue-400 mb-2">blaha.io</h1>
+
+                    <template x-if="!requestInfo.friend_name">
+                        <div>
+                            <p class="text-gray-400 mb-4">You need to visit your friend link first to request access.</p>
+                            <a href="/" class="text-blue-400 hover:text-blue-300">Go to homepage</a>
+                        </div>
+                    </template>
+
+                    <template x-if="requestInfo.friend_name && requestInfo.service">
+                        <div>
+                            <p class="text-xl text-gray-300 mb-6">
+                                Hi <span class="text-blue-300" x-text="requestInfo.friend_name"></span>!
+                            </p>
+
+                            <div class="text-5xl mb-4" x-text="requestInfo.service.icon || '🔒'"></div>
+                            <p class="text-gray-400 mb-6">
+                                You don't have access to <span class="text-white font-semibold" x-text="requestInfo.service.name"></span>.
+                            </p>
+
+                            <template x-if="requestInfo.has_pending_request">
+                                <div class="bg-yellow-900/50 border border-yellow-600 text-yellow-200 px-4 py-3 rounded">
+                                    Your request is pending approval.
+                                </div>
+                            </template>
+
+                            <template x-if="!requestInfo.has_pending_request && !requestSubmitted">
+                                <button @click="submitAccessRequest"
+                                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded transition-colors">
+                                    Request Access
+                                </button>
+                            </template>
+
+                            <template x-if="requestSubmitted">
+                                <div class="bg-green-900/50 border border-green-600 text-green-200 px-4 py-3 rounded">
+                                    Request submitted! You'll be notified when approved.
+                                </div>
+                            </template>
+
+                            <div x-show="requestError" class="mt-4 bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
+                                <span x-text="requestError"></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="requestInfo.friend_name && !requestInfo.service">
+                        <div>
+                            <p class="text-gray-400">Service not found.</p>
+                            <a href="/" class="text-blue-400 hover:text-blue-300 mt-4 inline-block">Go to homepage</a>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- ADMIN LOGIN -->
+        <template x-if="view === 'admin-login'">
+            <div class="flex flex-col items-center justify-center min-h-screen">
+                <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
+                    <h2 class="text-2xl font-bold mb-6 text-center">Admin Login</h2>
+                    <form @submit.prevent="adminLogin" id="admin-login-form" autocomplete="on">
+                        <!-- Hidden username field for password managers -->
+                        <input type="text" name="username" autocomplete="username" value="admin"
+                               class="hidden" aria-hidden="true">
+                        <input type="password" x-model="adminPassword" placeholder="Password"
+                               name="password" autocomplete="current-password" id="admin-password"
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 mb-4 focus:outline-none focus:border-blue-500">
+                        <div x-show="loginError" class="text-red-400 text-sm mb-4" x-text="loginError"></div>
+                        <button type="submit"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
+                            Login
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </template>
+
+        <!-- ADMIN PANEL -->
+        <template x-if="view === 'admin'">
+            <div class="max-w-6xl mx-auto px-4 py-8">
+                <div class="flex justify-between items-center mb-8">
+                    <h1 class="text-3xl font-bold text-blue-400">blaha.io Admin</h1>
+                    <button @click="adminLogout" class="text-gray-400 hover:text-white">Logout</button>
+                </div>
+
+                <!-- TABS -->
+                <div class="flex space-x-4 mb-6 border-b border-gray-700">
+                    <button @click="adminTab = 'friends'"
+                            :class="adminTab === 'friends' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
+                            class="px-4 py-2 -mb-px">Friends</button>
+                    <button @click="adminTab = 'services'"
+                            :class="adminTab === 'services' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
+                            class="px-4 py-2 -mb-px">Services</button>
+                    <button @click="adminTab = 'requests'"
+                            :class="adminTab === 'requests' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
+                            class="px-4 py-2 -mb-px relative">
+                        Requests
+                        <span x-show="accessRequests.length > 0"
+                              class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                              x-text="accessRequests.length"></span>
+                    </button>
+                </div>
+
+                <!-- FRIENDS TAB -->
+                <div x-show="adminTab === 'friends'">
+                    <!-- Integration Status Bar -->
+                    <div class="bg-gray-800 rounded-lg p-4 mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-semibold text-gray-300">Auto-Account Integrations</span>
+                            <button @click="checkAllStatus" class="text-blue-400 hover:text-blue-300 text-sm">Refresh All</button>
+                        </div>
+                        <div class="flex flex-wrap gap-4 text-sm">
+                            <!-- Plex Status -->
+                            <div class="flex items-center gap-2">
+                                <span>📺</span>
+                                <span class="text-gray-400">Plex:</span>
+                                <template x-if="plexStatus.connected">
+                                    <span class="text-green-400" x-text="plexStatus.username"></span>
+                                </template>
+                                <template x-if="!plexStatus.connected">
+                                    <span class="text-yellow-400" x-text="plexStatus.error || 'Not configured'"></span>
+                                </template>
+                            </div>
+                            <!-- Ombi Status -->
+                            <div class="flex items-center gap-2">
+                                <span>🎬</span>
+                                <span class="text-gray-400">Ombi:</span>
+                                <template x-if="ombiStatus.connected">
+                                    <span class="text-green-400">Connected</span>
+                                </template>
+                                <template x-if="!ombiStatus.connected">
+                                    <span class="text-yellow-400" x-text="ombiStatus.error || 'Not configured'"></span>
+                                </template>
+                            </div>
+                            <!-- Jellyfin Status -->
+                            <div class="flex items-center gap-2">
+                                <span>🎞️</span>
+                                <span class="text-gray-400">Jellyfin:</span>
+                                <template x-if="jellyfinStatus.connected">
+                                    <span class="text-green-400" x-text="jellyfinStatus.serverName || 'Connected'"></span>
+                                </template>
+                                <template x-if="!jellyfinStatus.connected">
+                                    <span class="text-yellow-400" x-text="jellyfinStatus.error || 'Not configured'"></span>
+                                </template>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Accounts are automatically created/deleted when granting/revoking Plex, Ombi, or Jellyfin services.</p>
+                    </div>
+
+                    <!-- Add Friend Form -->
+                    <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">Add Friend</h3>
+                        <form @submit.prevent="addFriend" class="flex flex-wrap gap-4">
+                            <input type="text" x-model="newFriendName" placeholder="Friend's name"
+                                   class="flex-1 min-w-48 bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                            <button type="submit"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded transition-colors">
+                                Add
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Friends List -->
+                    <div class="space-y-4">
+                        <template x-for="friend in friends" :key="friend.id">
+                            <div class="bg-gray-800 rounded-lg p-6">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h4 class="text-xl font-semibold" x-text="friend.name"></h4>
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <code class="text-sm text-gray-400 bg-gray-700 px-2 py-1 rounded"
+                                                  x-text="'blaha.io/f/' + friend.token"></code>
+                                            <button @click="copyUrl(friend.token)"
+                                                    class="text-blue-400 hover:text-blue-300 text-sm">Copy</button>
+                                        </div>
+                                        <div x-show="friend.last_visit" class="text-xs text-gray-500 mt-1">
+                                            Last visit: <span x-text="formatDate(friend.last_visit)"></span>
+                                        </div>
+                                        <!-- Account Status -->
+                                        <div class="flex items-center gap-3 mt-2 text-xs">
+                                            <span x-show="friend.plex_user_id" class="text-green-400 flex items-center gap-1">
+                                                📺 Plex
+                                                <span x-show="friend.plex_pin" class="text-gray-500">(PIN: <span x-text="friend.plex_pin"></span>)</span>
+                                            </span>
+                                            <span x-show="friend.ombi_user_id" class="text-green-400">🎬 Ombi</span>
+                                            <span x-show="friend.jellyfin_user_id" class="text-green-400">🎞️ Jellyfin</span>
+                                        </div>
+                                    </div>
+                                    <button @click="deleteFriend(friend.id)"
+                                            class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                </div>
+
+                                <div class="border-t border-gray-700 pt-4">
+                                    <p class="text-sm text-gray-400 mb-2">Services:</p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="service in services" :key="service.id">
+                                            <button @click="toggleService(friend, service)"
+                                                    :class="hasService(friend, service.id) ? getStackActiveClass(service.stack) : 'bg-gray-700 text-gray-400'"
+                                                    class="px-3 py-1 rounded text-sm hover:opacity-80 transition-opacity flex items-center gap-1">
+                                                <span x-text="service.icon" class="text-sm"></span>
+                                                <span x-text="service.name"></span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- REQUESTS TAB -->
+                <div x-show="adminTab === 'requests'">
+                    <template x-if="accessRequests.length === 0">
+                        <div class="bg-gray-800 rounded-lg p-6 text-center text-gray-400">
+                            No pending access requests.
+                        </div>
+                    </template>
+
+                    <div class="space-y-4">
+                        <template x-for="req in accessRequests" :key="req.id">
+                            <div class="bg-gray-800 rounded-lg p-6 flex items-center justify-between">
+                                <div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl" x-text="req.icon || '📝'"></span>
+                                        <div>
+                                            <span class="font-semibold text-white" x-text="req.friend_name"></span>
+                                            <span class="text-gray-400"> wants access to </span>
+                                            <span class="font-semibold text-blue-400" x-text="req.service_name"></span>
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1" x-text="formatDate(req.requested_at)"></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="approveRequest(req.id)"
+                                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm">
+                                        Approve
+                                    </button>
+                                    <button @click="denyRequest(req.id)"
+                                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm">
+                                        Deny
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- SERVICES TAB -->
+                <div x-show="adminTab === 'services'" x-data="{ showOtherServices: false }">
+                    <!-- Stack Legend -->
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <span class="text-gray-400 text-sm">Stacks:</span>
+                        <span class="px-2 py-1 rounded text-xs bg-purple-900 text-purple-200">media</span>
+                        <span class="px-2 py-1 rounded text-xs bg-blue-900 text-blue-200">infra</span>
+                        <span class="px-2 py-1 rounded text-xs bg-green-900 text-green-200">jitsi</span>
+                        <span class="px-2 py-1 rounded text-xs bg-orange-900 text-orange-200">priorities</span>
+                        <span class="px-2 py-1 rounded text-xs bg-gray-700 text-gray-300">other</span>
+                    </div>
+
+                    <!-- Default Services List -->
+                    <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
+                        <div class="bg-gray-700 px-4 py-3 flex items-center justify-between">
+                            <h3 class="font-semibold">Default Services <span class="text-gray-400 text-sm font-normal">(granted to new friends)</span></h3>
+                        </div>
+                        <table class="w-full">
+                            <thead class="bg-gray-750">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
+                                    <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
+                                    <th class="px-4 py-2 text-left text-sm text-gray-400">Stack</th>
+                                    <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
+                                    <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="service in services.filter(s => s.is_default)" :key="service.id">
+                                    <tr class="border-t border-gray-700">
+                                        <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
+                                        <td class="px-4 py-3">
+                                            <span class="font-medium" x-text="service.name"></span>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <span x-show="service.stack"
+                                                  :class="getStackClass(service.stack)"
+                                                  class="px-2 py-1 rounded text-xs"
+                                                  x-text="service.stack"></span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm truncate max-w-xs">
+                                            <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
+                                               target="_blank"
+                                               class="text-blue-400 hover:text-blue-300 hover:underline"
+                                               x-text="service.subdomain ? service.subdomain + '.blaha.io' : service.url"></a>
+                                        </td>
+                                        <td class="px-4 py-3 text-right space-x-2">
+                                            <button x-show="service.subdomain" @click="copyPreauthUrl(service.id)"
+                                                    class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
+                                            <button @click="deleteService(service.id)"
+                                                    class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                        <template x-if="services.filter(s => s.is_default).length === 0">
+                            <div class="px-4 py-6 text-center text-gray-500">No default services configured</div>
+                        </template>
+                    </div>
+
+                    <!-- Other Services (Collapsed) -->
+                    <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
+                        <button @click="showOtherServices = !showOtherServices"
+                                class="w-full bg-gray-700 px-4 py-3 flex items-center justify-between hover:bg-gray-650 transition-colors">
+                            <h3 class="font-semibold">
+                                Other Services
+                                <span class="text-gray-400 text-sm font-normal">(<span x-text="services.filter(s => !s.is_default).length"></span> services)</span>
+                            </h3>
+                            <span x-text="showOtherServices ? '▼' : '▶'" class="text-gray-400"></span>
+                        </button>
+                        <div x-show="showOtherServices" x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                             x-transition:leave="transition ease-in duration-150"
+                             x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+                            <table class="w-full">
+                                <thead class="bg-gray-750">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
+                                        <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
+                                        <th class="px-4 py-2 text-left text-sm text-gray-400">Stack</th>
+                                        <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
+                                        <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="service in services.filter(s => !s.is_default)" :key="service.id">
+                                        <tr class="border-t border-gray-700">
+                                            <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
+                                            <td class="px-4 py-3">
+                                                <span class="font-medium" x-text="service.name"></span>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <span x-show="service.stack"
+                                                      :class="getStackClass(service.stack)"
+                                                      class="px-2 py-1 rounded text-xs"
+                                                      x-text="service.stack"></span>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm truncate max-w-xs">
+                                                <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
+                                                   target="_blank"
+                                                   class="text-blue-400 hover:text-blue-300 hover:underline"
+                                                   x-text="service.subdomain ? service.subdomain + '.blaha.io' : service.url"></a>
+                                            </td>
+                                            <td class="px-4 py-3 text-right space-x-2">
+                                                <button x-show="service.subdomain" @click="copyPreauthUrl(service.id)"
+                                                        class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
+                                                <button @click="deleteService(service.id)"
+                                                        class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            <template x-if="services.filter(s => !s.is_default).length === 0">
+                                <div class="px-4 py-6 text-center text-gray-500">No other services</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Add Service Form (moved to bottom) -->
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">Add Service</h3>
+                        <form @submit.prevent="addService" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <input type="text" x-model="newService.name" placeholder="Service name" required
+                                   class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                            <input type="url" x-model="newService.url" placeholder="URL (https://...)" required
+                                   class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                            <input type="text" x-model="newService.icon" placeholder="Icon (emoji)"
+                                   class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                            <input type="text" x-model="newService.description" placeholder="Description"
+                                   class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                            <input type="text" x-model="newService.subdomain" placeholder="Subdomain (e.g. ombi)"
+                                   class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                            <select x-model="newService.stack"
+                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="">No stack</option>
+                                <option value="media">media</option>
+                                <option value="infra">infra</option>
+                                <option value="jitsi">jitsi</option>
+                                <option value="priorities">priorities</option>
+                            </select>
+                            <label class="flex items-center gap-2 text-gray-300">
+                                <input type="checkbox" x-model="newService.is_default"
+                                       class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                                Default for new friends
+                            </label>
+                            <button type="submit"
+                                    class="md:col-span-2 lg:col-span-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded transition-colors">
+                                Add Service
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                view: 'public',
+                adminTab: 'friends',
+
+                // Admin state
+                adminPassword: '',
+                loginError: '',
+                services: [],
+                friends: [],
+                accessRequests: [],
+                newFriendName: '',
+                newService: { name: '', url: '', icon: '', description: '', subdomain: '', stack: '', is_default: false },
+                plexStatus: { connected: false, username: '', error: '' },
+                ombiStatus: { connected: false, error: '' },
+                jellyfinStatus: { connected: false, serverName: '', error: '' },
+
+                // Friend state
+                friendName: '',
+                friendServices: [],
+                friendError: '',
+
+                // Request access state
+                requestInfo: { service: null, friend_name: null, has_pending_request: false },
+                requestSubmitted: false,
+                requestError: '',
+                requestService: '',
+
+                async init() {
+                    const path = window.location.pathname;
+                    const params = new URLSearchParams(window.location.search);
+
+                    if (path === '/admin') {
+                        const resp = await fetch('/api/admin/verify');
+                        const data = await resp.json();
+                        if (data.authenticated) {
+                            this.view = 'admin';
+                            await this.loadAdminData();
+                        } else {
+                            this.view = 'admin-login';
+                        }
+                    } else if (path === '/request-access') {
+                        this.requestService = params.get('service') || '';
+                        await this.loadRequestAccessInfo();
+                        this.view = 'request-access';
+                    } else if (path.startsWith('/f/')) {
+                        const token = path.split('/f/')[1];
+                        await this.loadFriendView(token);
+                    } else {
+                        this.view = 'public';
+                    }
+                },
+
+                async adminLogin() {
+                    this.loginError = '';
+                    try {
+                        const resp = await fetch('/api/admin/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password: this.adminPassword })
+                        });
+                        if (resp.ok) {
+                            this.view = 'admin';
+                            await this.loadAdminData();
+                        } else {
+                            this.loginError = 'Invalid password';
+                        }
+                    } catch (e) {
+                        this.loginError = 'Login failed';
+                    }
+                },
+
+                async adminLogout() {
+                    await fetch('/api/admin/logout', { method: 'POST' });
+                    this.view = 'admin-login';
+                    this.adminPassword = '';
+                },
+
+                async loadAdminData() {
+                    const [servicesResp, friendsResp, requestsResp] = await Promise.all([
+                        fetch('/api/services'),
+                        fetch('/api/friends'),
+                        fetch('/api/access-requests')
+                    ]);
+                    this.services = await servicesResp.json();
+                    this.friends = await friendsResp.json();
+                    this.accessRequests = await requestsResp.json();
+                    await this.checkAllStatus();
+                },
+
+                async checkAllStatus() {
+                    await Promise.all([
+                        this.checkPlexStatus(),
+                        this.checkOmbiStatus(),
+                        this.checkJellyfinStatus()
+                    ]);
+                },
+
+                async checkPlexStatus() {
+                    try {
+                        const resp = await fetch('/api/plex/status');
+                        this.plexStatus = await resp.json();
+                    } catch (e) {
+                        this.plexStatus = { connected: false, error: 'Failed to check' };
+                    }
+                },
+
+                async checkOmbiStatus() {
+                    try {
+                        const resp = await fetch('/api/ombi/status');
+                        this.ombiStatus = await resp.json();
+                    } catch (e) {
+                        this.ombiStatus = { connected: false, error: 'Failed to check' };
+                    }
+                },
+
+                async checkJellyfinStatus() {
+                    try {
+                        const resp = await fetch('/api/jellyfin/status');
+                        this.jellyfinStatus = await resp.json();
+                    } catch (e) {
+                        this.jellyfinStatus = { connected: false, error: 'Failed to check' };
+                    }
+                },
+
+                async addFriend() {
+                    if (!this.newFriendName.trim()) return;
+                    await fetch('/api/friends', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: this.newFriendName, service_ids: [] })
+                    });
+                    this.newFriendName = '';
+                    await this.loadAdminData();
+                },
+
+                async deleteFriend(id) {
+                    if (!confirm('Delete this friend?')) return;
+                    await fetch(`/api/friends/${id}`, { method: 'DELETE' });
+                    await this.loadAdminData();
+                },
+
+                async toggleService(friend, service) {
+                    const currentIds = friend.services.map(s => s.id);
+                    const isAdding = !currentIds.includes(service.id);
+                    const newIds = isAdding
+                        ? [...currentIds, service.id]
+                        : currentIds.filter(id => id !== service.id);
+
+                    const resp = await fetch(`/api/friends/${friend.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ service_ids: newIds })
+                    });
+
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        // Show feedback about account operations
+                        if (data.account_operations && data.account_operations.length > 0) {
+                            const msgs = data.account_operations.map(op => {
+                                if (op.success) {
+                                    return `${op.service}: Account ${op.action}`;
+                                } else {
+                                    return `${op.service}: ${op.error || 'Failed'}`;
+                                }
+                            });
+                            // Brief notification - could use a toast library in future
+                            console.log('Account operations:', msgs.join(', '));
+                        }
+                    }
+                    await this.loadAdminData();
+                },
+
+                hasService(friend, serviceId) {
+                    return friend.services.some(s => s.id === serviceId);
+                },
+
+                async addService() {
+                    if (!this.newService.name || !this.newService.url) return;
+                    await fetch('/api/services', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(this.newService)
+                    });
+                    this.newService = { name: '', url: '', icon: '', description: '', subdomain: '', stack: '', is_default: false };
+                    await this.loadAdminData();
+                },
+
+                getStackClass(stack) {
+                    const classes = {
+                        'media': 'bg-purple-900 text-purple-200',
+                        'infra': 'bg-blue-900 text-blue-200',
+                        'jitsi': 'bg-green-900 text-green-200',
+                        'priorities': 'bg-orange-900 text-orange-200'
+                    };
+                    return classes[stack] || 'bg-gray-700 text-gray-300';
+                },
+
+                getStackActiveClass(stack) {
+                    const classes = {
+                        'media': 'bg-purple-600 text-white',
+                        'infra': 'bg-blue-600 text-white',
+                        'jitsi': 'bg-green-600 text-white',
+                        'priorities': 'bg-orange-600 text-white'
+                    };
+                    return classes[stack] || 'bg-blue-600 text-white';
+                },
+
+                async deleteService(id) {
+                    if (!confirm('Delete this service? It will be removed from all friends.')) return;
+                    await fetch(`/api/services/${id}`, { method: 'DELETE' });
+                    await this.loadAdminData();
+                },
+
+                async loadFriendView(token) {
+                    try {
+                        const resp = await fetch(`/api/f/${token}`);
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            this.friendName = data.name;
+                            this.friendServices = data.services;
+                            this.view = 'friend';
+                        } else {
+                            this.friendError = 'Invalid or expired link';
+                            this.view = 'friend';
+                        }
+                    } catch (e) {
+                        this.friendError = 'Failed to load';
+                        this.view = 'friend';
+                    }
+                },
+
+                copyUrl(token) {
+                    navigator.clipboard.writeText(`https://blaha.io/f/${token}`);
+                },
+
+                async copyPreauthUrl(serviceId) {
+                    try {
+                        const resp = await fetch(`/api/services/${serviceId}/preauth-url`);
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            await navigator.clipboard.writeText(data.url);
+                            alert(`Pre-auth URL for ${data.service} copied to clipboard!`);
+                        } else {
+                            const err = await resp.json();
+                            alert(`Error: ${err.detail}`);
+                        }
+                    } catch (e) {
+                        alert('Failed to get pre-auth URL');
+                    }
+                },
+
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    return new Date(dateStr).toLocaleDateString();
+                },
+
+                // Request access methods
+                async loadRequestAccessInfo() {
+                    if (!this.requestService) return;
+                    try {
+                        const resp = await fetch(`/api/request-access-info?service=${this.requestService}`);
+                        if (resp.ok) {
+                            this.requestInfo = await resp.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load request info', e);
+                    }
+                },
+
+                async submitAccessRequest() {
+                    this.requestError = '';
+                    try {
+                        const resp = await fetch(`/api/access-requests?service=${this.requestService}`, {
+                            method: 'POST'
+                        });
+                        if (resp.ok) {
+                            this.requestSubmitted = true;
+                        } else {
+                            const data = await resp.json();
+                            this.requestError = data.detail || 'Request failed';
+                        }
+                    } catch (e) {
+                        this.requestError = 'Request failed';
+                    }
+                },
+
+                // Admin request methods
+                async approveRequest(id) {
+                    await fetch(`/api/access-requests/${id}/approve`, { method: 'POST' });
+                    await this.loadAdminData();
+                },
+
+                async denyRequest(id) {
+                    if (!confirm('Deny this request?')) return;
+                    await fetch(`/api/access-requests/${id}/deny`, { method: 'POST' });
+                    await this.loadAdminData();
+                }
+            }
+        }
+    </script>
+</body>
+</html>

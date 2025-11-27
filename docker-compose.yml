@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  blaha-homepage:
+    build: .
+    container_name: blaha-homepage
+    restart: unless-stopped
+    env_file:
+      - .env
+    network_mode: host
+    volumes:
+      - ./data:/app/data
