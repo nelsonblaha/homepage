@@ -342,6 +342,7 @@
                                 <tr>
                                     <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
                                     <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
+                                    <th class="px-4 py-2 text-left text-sm text-gray-400">Description</th>
                                     <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
                                     <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
                                 </tr>
@@ -352,6 +353,27 @@
                                         <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
                                         <td class="px-4 py-3">
                                             <span class="font-medium" x-text="service.name"></span>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm max-w-xs">
+                                            <template x-if="editingServiceId !== service.id">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-gray-400" x-text="service.description || '-'"></span>
+                                                    <button @click="startEditDescription(service)"
+                                                            class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
+                                                </div>
+                                            </template>
+                                            <template x-if="editingServiceId === service.id">
+                                                <div class="flex items-center gap-2">
+                                                    <input type="text" x-model="editingDescription"
+                                                           @keyup.enter="saveDescription(service)"
+                                                           @keyup.escape="cancelEditDescription()"
+                                                           class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm w-full focus:outline-none focus:border-blue-500">
+                                                    <button @click="saveDescription(service)"
+                                                            class="text-green-400 hover:text-green-300 text-xs">Save</button>
+                                                    <button @click="cancelEditDescription()"
+                                                            class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
+                                                </div>
+                                            </template>
                                         </td>
                                         <td class="px-4 py-3 text-sm truncate max-w-xs">
                                             <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
@@ -395,6 +417,7 @@
                                     <tr>
                                         <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
                                         <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
+                                        <th class="px-4 py-2 text-left text-sm text-gray-400">Description</th>
                                         <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
                                         <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
                                     </tr>
@@ -405,6 +428,27 @@
                                             <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
                                             <td class="px-4 py-3">
                                                 <span class="font-medium" x-text="service.name"></span>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm max-w-xs">
+                                                <template x-if="editingServiceId !== service.id">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-gray-400" x-text="service.description || '-'"></span>
+                                                        <button @click="startEditDescription(service)"
+                                                                class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
+                                                    </div>
+                                                </template>
+                                                <template x-if="editingServiceId === service.id">
+                                                    <div class="flex items-center gap-2">
+                                                        <input type="text" x-model="editingDescription"
+                                                               @keyup.enter="saveDescription(service)"
+                                                               @keyup.escape="cancelEditDescription()"
+                                                               class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm w-full focus:outline-none focus:border-blue-500">
+                                                        <button @click="saveDescription(service)"
+                                                                class="text-green-400 hover:text-green-300 text-xs">Save</button>
+                                                        <button @click="cancelEditDescription()"
+                                                                class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
+                                                    </div>
+                                                </template>
                                             </td>
                                             <td class="px-4 py-3 text-sm truncate max-w-xs">
                                                 <a :href="service.subdomain ? 'https://' + service.subdomain + '.blaha.io' : service.url"
@@ -478,6 +522,8 @@
                 plexStatus: { connected: false, username: '', error: '' },
                 ombiStatus: { connected: false, error: '' },
                 jellyfinStatus: { connected: false, serverName: '', error: '' },
+                editingServiceId: null,
+                editingDescription: '',
 
                 // Friend state
                 friendName: '',
@@ -815,6 +861,46 @@
                     if (!confirm('Deny this request?')) return;
                     await fetch(`/api/access-requests/${id}/deny`, { method: 'POST' });
                     await this.loadAdminData();
+                },
+
+                // Service description editing
+                startEditDescription(service) {
+                    this.editingServiceId = service.id;
+                    this.editingDescription = service.description || '';
+                },
+
+                cancelEditDescription() {
+                    this.editingServiceId = null;
+                    this.editingDescription = '';
+                },
+
+                async saveDescription(service) {
+                    try {
+                        const resp = await fetch(`/api/services/${service.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: service.name,
+                                url: service.url,
+                                icon: service.icon,
+                                description: this.editingDescription,
+                                display_order: service.display_order || 0,
+                                subdomain: service.subdomain || '',
+                                stack: service.stack || '',
+                                is_default: service.is_default
+                            })
+                        });
+                        if (resp.ok) {
+                            this.editingServiceId = null;
+                            this.editingDescription = '';
+                            await this.loadAdminData();
+                        } else {
+                            const err = await resp.json();
+                            alert(`Error: ${err.detail}`);
+                        }
+                    } catch (e) {
+                        alert('Failed to save description');
+                    }
                 }
             }
         }
