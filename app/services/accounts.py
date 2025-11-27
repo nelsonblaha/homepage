@@ -2,12 +2,14 @@
 from integrations.plex import create_plex_user, delete_plex_user, get_plex_account
 from integrations.ombi import create_ombi_user, delete_ombi_user
 from integrations.jellyfin import create_jellyfin_user, delete_jellyfin_user
+from integrations.nextcloud import create_nextcloud_user, delete_nextcloud_user
 
 # Service names that trigger auto-account creation (case-insensitive match)
 # Plex removed - users need plex.tv accounts, we just skip basic auth for them
 MANAGED_SERVICES = {
     "ombi": "ombi_user_id",
-    "jellyfin": "jellyfin_user_id"
+    "jellyfin": "jellyfin_user_id",
+    "nextcloud": "nextcloud_user_id"
 }
 
 
@@ -52,6 +54,18 @@ async def handle_service_grant(friend_id: int, friend_name: str, service_name: s
         else:
             result["error"] = "Failed to create Jellyfin user"
 
+    elif service_lower == "nextcloud":
+        nc_result = await create_nextcloud_user(friend_name)
+        if nc_result:
+            await db.execute(
+                "UPDATE friends SET nextcloud_user_id = ?, nextcloud_password = ? WHERE id = ?",
+                (str(nc_result["id"]), nc_result.get("password", ""), friend_id)
+            )
+            result["action"] = "created"
+            result["success"] = True
+        else:
+            result["error"] = "Failed to create Nextcloud user"
+
     return result
 
 
@@ -62,7 +76,7 @@ async def handle_service_revoke(friend_id: int, service_name: str, db) -> dict:
 
     # Get current user IDs
     cursor = await db.execute(
-        "SELECT plex_user_id, ombi_user_id, jellyfin_user_id FROM friends WHERE id = ?",
+        "SELECT plex_user_id, ombi_user_id, jellyfin_user_id, nextcloud_user_id FROM friends WHERE id = ?",
         (friend_id,)
     )
     friend = await cursor.fetchone()
@@ -101,5 +115,16 @@ async def handle_service_revoke(friend_id: int, service_name: str, db) -> dict:
             result["success"] = True
         else:
             result["error"] = "Failed to delete Jellyfin user"
+
+    elif service_lower == "nextcloud" and friend[3]:
+        if await delete_nextcloud_user(friend[3]):
+            await db.execute(
+                "UPDATE friends SET nextcloud_user_id = '', nextcloud_password = '' WHERE id = ?",
+                (friend_id,)
+            )
+            result["action"] = "deleted"
+            result["success"] = True
+        else:
+            result["error"] = "Failed to delete Nextcloud user"
 
     return result

@@ -11,6 +11,7 @@ from services.accounts import MANAGED_SERVICES, handle_service_grant, handle_ser
 from integrations.plex import get_plex_account, delete_plex_user
 from integrations.ombi import delete_ombi_user
 from integrations.jellyfin import delete_jellyfin_user
+from integrations.nextcloud import delete_nextcloud_user
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
 
@@ -183,7 +184,7 @@ async def delete_friend(friend_id: int, delete_accounts: bool = True, _: bool = 
 
         if delete_accounts:
             cursor = await db.execute(
-                "SELECT plex_user_id, ombi_user_id, jellyfin_user_id FROM friends WHERE id = ?",
+                "SELECT plex_user_id, ombi_user_id, jellyfin_user_id, nextcloud_user_id FROM friends WHERE id = ?",
                 (friend_id,)
             )
             friend = await cursor.fetchone()
@@ -194,6 +195,8 @@ async def delete_friend(friend_id: int, delete_accounts: bool = True, _: bool = 
                     await delete_ombi_user(friend["ombi_user_id"])
                 if friend.get("jellyfin_user_id"):
                     await delete_jellyfin_user(friend["jellyfin_user_id"])
+                if friend.get("nextcloud_user_id"):
+                    await delete_nextcloud_user(friend["nextcloud_user_id"])
 
         await db.execute("DELETE FROM friend_services WHERE friend_id = ?", (friend_id,))
         await db.execute("DELETE FROM friends WHERE id = ?", (friend_id,))
@@ -240,3 +243,39 @@ async def get_friend_view(token: str):
         services = await cursor.fetchall()
 
         return FriendView(name=friend["name"], services=services)
+
+
+@public_router.get("/f/{token}/credentials/{service_key}")
+async def get_friend_credentials(token: str, service_key: str):
+    """Get stored credentials for a service (Nextcloud, etc.)"""
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+
+        cursor = await db.execute(
+            "SELECT * FROM friends WHERE token = ?",
+            (token,)
+        )
+        friend = await cursor.fetchone()
+
+        if not friend:
+            raise HTTPException(status_code=404, detail="Invalid link")
+
+        # Map service key to credential fields
+        credential_map = {
+            "nextcloud": ("nextcloud_user_id", "nextcloud_password"),
+            "ombi": ("ombi_user_id", "ombi_password"),
+            "jellyfin": ("jellyfin_user_id", "jellyfin_password"),
+        }
+
+        service_lower = service_key.lower()
+        if service_lower not in credential_map:
+            raise HTTPException(status_code=404, detail="No credentials for this service")
+
+        user_field, pass_field = credential_map[service_lower]
+        username = friend.get(user_field, "")
+        password = friend.get(pass_field, "")
+
+        if not username or not password:
+            raise HTTPException(status_code=404, detail="No credentials stored")
+
+        return {"username": username, "password": password}

@@ -55,18 +55,64 @@
 
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="services-grid">
                     <template x-for="service in friendServices" :key="service.id">
-                        <a :href="getServiceUrl(service)" target="_blank"
-                           class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative">
+                        <div @click="handleServiceClick(service)"
+                             class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative cursor-pointer">
                             <!-- Auth indicator -->
                             <span x-show="isAutoAuth(service)"
                                   class="absolute top-2 right-2 text-green-400 text-sm" title="auto-login">↗</span>
-                            <span x-show="!isAutoAuth(service)"
-                                  class="absolute top-2 right-2 text-yellow-400 text-sm" title="account needed">🔒</span>
+                            <span x-show="needsManualLogin(service)"
+                                  class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
+                            <span x-show="!isAutoAuth(service) && !needsManualLogin(service)"
+                                  class="absolute top-2 right-2 text-gray-400 text-sm" title="external account">🔒</span>
                             <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
                             <div class="font-semibold" x-text="service.name"></div>
                             <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
-                        </a>
+                        </div>
                     </template>
+                </div>
+
+                <!-- Credentials Modal -->
+                <div x-show="showCredentials" x-cloak
+                     class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+                     @click.self="showCredentials = false">
+                    <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-gray-700">
+                        <div class="text-center mb-6">
+                            <span class="text-4xl" x-text="credentialsService?.icon || '🔐'"></span>
+                            <h3 class="text-xl font-bold mt-2" x-text="credentialsService?.name"></h3>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-sm text-gray-400">Username</label>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <code class="flex-1 bg-gray-700 px-3 py-2 rounded text-blue-300 font-mono" x-text="friendCredentials.username"></code>
+                                    <button @click="copyToClipboard(friendCredentials.username)"
+                                            class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm">Copy</button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="text-sm text-gray-400">Password</label>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <code class="flex-1 bg-gray-700 px-3 py-2 rounded text-green-300 font-mono" x-text="friendCredentials.password"></code>
+                                    <button @click="copyToClipboard(friendCredentials.password)"
+                                            class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex gap-3">
+                            <a :href="getDirectServiceUrl(credentialsService)"
+                               target="_blank"
+                               class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded text-center transition-colors">
+                                Go to <span x-text="credentialsService?.name"></span>
+                            </a>
+                            <button @click="showCredentials = false"
+                                    class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </template>
@@ -256,8 +302,19 @@
                                     <span class="text-yellow-400" x-text="jellyfinStatus.error || 'Not configured'"></span>
                                 </template>
                             </div>
+                            <!-- Nextcloud Status -->
+                            <div class="flex items-center gap-2">
+                                <span>☁️</span>
+                                <span class="text-gray-400">Nextcloud:</span>
+                                <template x-if="nextcloudStatus.connected">
+                                    <span class="text-green-400">Connected</span>
+                                </template>
+                                <template x-if="!nextcloudStatus.connected">
+                                    <span class="text-yellow-400" x-text="nextcloudStatus.error || 'Not configured'"></span>
+                                </template>
+                            </div>
                         </div>
-                        <p class="text-xs text-gray-500 mt-2">Accounts are automatically created/deleted when granting/revoking Plex, Ombi, or Jellyfin services.</p>
+                        <p class="text-xs text-gray-500 mt-2">Accounts are automatically created/deleted when granting/revoking Plex, Ombi, Jellyfin, or Nextcloud services.</p>
                     </div>
 
                     <!-- Add Friend Form -->
@@ -298,6 +355,7 @@
                                             </span>
                                             <span x-show="friend.ombi_user_id" class="text-green-400">🎬 Ombi</span>
                                             <span x-show="friend.jellyfin_user_id" class="text-green-400">🎞️ Jellyfin</span>
+                                            <span x-show="friend.nextcloud_user_id" class="text-green-400">☁️ Nextcloud</span>
                                         </div>
                                     </div>
                                     <button @click="deleteFriend(friend.id)"
@@ -553,6 +611,7 @@
                 plexStatus: { connected: false, username: '', error: '' },
                 ombiStatus: { connected: false, error: '' },
                 jellyfinStatus: { connected: false, serverName: '', error: '' },
+                nextcloudStatus: { connected: false, error: '' },
                 editingServiceId: null,
                 editingDescription: '',
 
@@ -560,6 +619,10 @@
                 friendName: '',
                 friendServices: [],
                 friendError: '',
+                showCredentials: false,
+                credentialsService: null,
+                friendCredentials: { username: '', password: '' },
+                friendToken: '',
 
                 // Request access state
                 requestInfo: { service: null, friend_name: null, has_pending_request: false },
@@ -646,7 +709,8 @@
                     await Promise.all([
                         this.checkPlexStatus(),
                         this.checkOmbiStatus(),
-                        this.checkJellyfinStatus()
+                        this.checkJellyfinStatus(),
+                        this.checkNextcloudStatus()
                     ]);
                 },
 
@@ -674,6 +738,15 @@
                         this.jellyfinStatus = await resp.json();
                     } catch (e) {
                         this.jellyfinStatus = { connected: false, error: 'Failed to check' };
+                    }
+                },
+
+                async checkNextcloudStatus() {
+                    try {
+                        const resp = await fetch('/api/nextcloud/status');
+                        this.nextcloudStatus = await resp.json();
+                    } catch (e) {
+                        this.nextcloudStatus = { connected: false, error: 'Failed to check' };
                     }
                 },
 
@@ -767,6 +840,7 @@
                 },
 
                 async loadFriendView(token) {
+                    this.friendToken = token;
                     try {
                         const resp = await fetch(`/api/f/${token}`);
                         if (resp.ok) {
@@ -818,6 +892,50 @@
 
                     // 'basic' preauth URLs are blocked by Chrome, so not truly auto
                     return false;
+                },
+
+                needsManualLogin(service) {
+                    // Services where we have stored credentials but user must enter them manually
+                    const authType = service.auth_type || 'none';
+                    return authType === 'nextcloud' || authType === 'basic';
+                },
+
+                async handleServiceClick(service) {
+                    // For services requiring manual login with stored credentials, show modal
+                    if (this.needsManualLogin(service)) {
+                        await this.showCredentialsModal(service);
+                    } else {
+                        // For auto-auth or external services, just navigate
+                        window.open(this.getServiceUrl(service), '_blank');
+                    }
+                },
+
+                async showCredentialsModal(service) {
+                    this.credentialsService = service;
+                    try {
+                        const resp = await fetch(`/api/f/${this.friendToken}/credentials/${service.subdomain || service.name.toLowerCase()}`);
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            this.friendCredentials = { username: data.username, password: data.password };
+                            this.showCredentials = true;
+                        } else {
+                            // No stored credentials, just open the service
+                            window.open(this.getDirectServiceUrl(service), '_blank');
+                        }
+                    } catch (e) {
+                        window.open(this.getDirectServiceUrl(service), '_blank');
+                    }
+                },
+
+                getDirectServiceUrl(service) {
+                    if (service?.subdomain) {
+                        return `https://${service.subdomain}.blaha.io`;
+                    }
+                    return service?.url || '#';
+                },
+
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(text);
                 },
 
                 async copyPreauthUrl(serviceId) {

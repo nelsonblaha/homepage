@@ -14,6 +14,7 @@ from routes.requests import router as requests_router
 from integrations.plex import router as plex_router
 from integrations.ombi import router as ombi_router
 from integrations.jellyfin import router as jellyfin_router
+from integrations.nextcloud import router as nextcloud_router
 
 
 @asynccontextmanager
@@ -33,6 +34,7 @@ app.include_router(requests_router)
 app.include_router(plex_router)
 app.include_router(ombi_router)
 app.include_router(jellyfin_router)
+app.include_router(nextcloud_router)
 
 
 # =============================================================================
