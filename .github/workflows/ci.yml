@@ -53,7 +53,10 @@ jobs:
         run: pkill -f "uvicorn main:app" || true
 
   # Integration tests with real containers (Ombi, Jellyfin)
+  # DISABLED: Cleanup removes production container due to name collision
+  # TODO: Run in isolated directory or use unique project name
   integration-tests:
+    if: false
     runs-on: self-hosted
     needs: unit-tests
 
@@ -124,7 +127,7 @@ jobs:
           pkill -f "uvicorn main:app" || true
 
   deploy:
-    needs: [unit-tests, integration-tests]
+    needs: [unit-tests]  # integration-tests disabled until isolation fixed
     runs-on: self-hosted
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
