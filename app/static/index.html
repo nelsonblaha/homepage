@@ -388,7 +388,7 @@
 
                     <!-- Friends List -->
                     <div class="space-y-3">
-                        <template x-for="friend in friends" :key="friend.id">
+                        <template x-for="friend in getSortedFriends()" :key="friend.id">
                             <div class="bg-gray-800 rounded-lg overflow-hidden">
                                 <!-- Collapsible Header -->
                                 <button @click="expandedFriends[friend.id] = !expandedFriends[friend.id]"
@@ -1037,19 +1037,11 @@
 
                 isAutoAuth(service) {
                     // Determines if a service auto-authenticates (no user intervention needed)
-                    // Plex always requires plex.tv login
-                    if (service.name.toLowerCase() === 'plex') return false;
-
+                    // Only services where we create accounts and auto-login via /auth/{subdomain}
                     const authType = service.auth_type || 'none';
 
-                    // These auth types handle login automatically
-                    if (authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr') return true;
-
-                    // 'none' with subdomain = forward auth (auto)
-                    if (authType === 'none' && service.subdomain) return true;
-
-                    // 'basic' preauth URLs are blocked by Chrome, so not truly auto
-                    return false;
+                    // These auth types have actual auto-login implementations
+                    return authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr';
                 },
 
                 needsManualLogin(service) {
@@ -1146,20 +1138,36 @@
                     const seconds = Math.floor((now - date) / 1000);
 
                     const intervals = [
-                        { label: 'y', seconds: 31536000 },
-                        { label: 'mo', seconds: 2592000 },
-                        { label: 'd', seconds: 86400 },
-                        { label: 'h', seconds: 3600 },
-                        { label: 'm', seconds: 60 }
+                        { label: 'year', plural: 'years', seconds: 31536000 },
+                        { label: 'month', plural: 'months', seconds: 2592000 },
+                        { label: 'week', plural: 'weeks', seconds: 604800 },
+                        { label: 'day', plural: 'days', seconds: 86400 },
+                        { label: 'hour', plural: 'hours', seconds: 3600 },
+                        { label: 'minute', plural: 'minutes', seconds: 60 }
                     ];
 
                     for (const interval of intervals) {
                         const count = Math.floor(seconds / interval.seconds);
                         if (count >= 1) {
-                            return count + interval.label + ' ago';
+                            return count + ' ' + (count === 1 ? interval.label : interval.plural) + ' ago';
                         }
                     }
                     return 'just now';
+                },
+
+                getSortedFriends() {
+                    return [...this.friends].sort((a, b) => {
+                        // First sort by last_visit (most recent first)
+                        // Friends with no visit go to the end
+                        if (a.last_visit && !b.last_visit) return -1;
+                        if (!a.last_visit && b.last_visit) return 1;
+                        if (a.last_visit && b.last_visit) {
+                            const dateCompare = new Date(b.last_visit) - new Date(a.last_visit);
+                            if (dateCompare !== 0) return dateCompare;
+                        }
+                        // Then sort alphabetically by name
+                        return a.name.localeCompare(b.name);
+                    });
                 },
 
                 // Request access methods
