@@ -22,13 +22,15 @@ async def create_overseerr_user(username: str) -> dict | None:
             email = f"{username.lower().replace(' ', '')}@blaha.io"
 
             # Create the user
+            # Permissions are bit flags: 2=REQUEST, 32=AUTO_APPROVE
+            # 34 = REQUEST + AUTO_APPROVE (requests are auto-approved)
             resp = await client.post(
                 f"{OVERSEERR_URL}/api/v1/user",
                 headers={"X-Api-Key": OVERSEERR_API_KEY, "Content-Type": "application/json"},
                 json={
                     "email": email,
                     "username": username,
-                    "permissions": 2  # REQUEST permission
+                    "permissions": 34  # REQUEST + AUTO_APPROVE
                 },
                 timeout=10.0
             )
