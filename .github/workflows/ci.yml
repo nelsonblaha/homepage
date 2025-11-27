@@ -53,10 +53,7 @@ jobs:
         run: pkill -f "uvicorn main:app" || true
 
   # Integration tests with real containers (Ombi, Jellyfin)
-  # DISABLED: Cleanup removes production container due to name collision
-  # TODO: Run in isolated directory or use unique project name
   integration-tests:
-    if: false
     runs-on: self-hosted
     needs: unit-tests
 
@@ -73,8 +70,8 @@ jobs:
 
       - name: Start test containers
         run: |
-          docker compose -f docker-compose.ci.yml down -v --remove-orphans || true
-          docker compose -f docker-compose.ci.yml up -d ombi
+          docker compose -p blaha-ci -f docker-compose.ci.yml down -v --remove-orphans || true
+          docker compose -p blaha-ci -f docker-compose.ci.yml up -d ombi
           echo "Waiting for Ombi to initialize (this takes a while on first run)..."
           sleep 30
 
@@ -123,11 +120,11 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.ci.yml down -v --remove-orphans || true
+          docker compose -p blaha-ci -f docker-compose.ci.yml down -v --remove-orphans || true
           pkill -f "uvicorn main:app" || true
 
   deploy:
-    needs: [unit-tests]  # integration-tests disabled until isolation fixed
+    needs: [unit-tests, integration-tests]
     runs-on: self-hosted
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
