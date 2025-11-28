@@ -32,7 +32,9 @@ jobs:
           SESSION_SECRET: testsecret1234567890abcdef
           BASE_DOMAIN: localhost
           COOKIE_DOMAIN: ""
-        run: pytest tests/unit/ -v --tb=short
+        run: |
+          cd app
+          pytest ../tests/unit/ -v --tb=short
 
   # Cypress E2E tests without external dependencies
   cypress-unit:
