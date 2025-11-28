@@ -172,17 +172,17 @@ jobs:
           # First verify container is running
           docker ps | grep "$OMBI_CONTAINER" || echo "WARNING: Container $OMBI_CONTAINER not found!"
 
-          for i in $(seq 1 120); do
+          for i in $(seq 1 60); do
             # Access Ombi via container name on shared network (internal port 3579)
             if curl -s --max-time 5 "http://$OMBI_CONTAINER:$OMBI_PORT/api/v1/Status" | grep -q "200"; then
               echo "Ombi API is ready after $i attempts"
               echo "OMBI_CONTAINER=$OMBI_CONTAINER" >> $GITHUB_ENV
               exit 0
             fi
-            echo "Attempt $i/120 - Ombi API not ready yet..."
-            sleep 5
+            echo "Attempt $i/60 - Ombi API not ready yet..."
+            sleep 2
           done
-          echo "ERROR: Ombi API failed to start after 10 minutes"
+          echo "ERROR: Ombi API failed to start after 2 minutes"
           docker compose -p $CI_PROJECT -f docker-compose.ci.yml logs ombi
           exit 1
 
