@@ -386,20 +386,53 @@
                                     </div>
 
                                     <div class="border-t border-gray-700 pt-3">
-                                        <p class="text-sm text-gray-400 mb-2">Services:</p>
-                                        <div class="flex flex-wrap gap-2">
-                                            <template x-for="service in services" :key="service.id">
-                                                <button @click.stop="toggleService(friend, service)"
-                                                        :class="hasService(friend, service.id) ? getStackActiveClass(service.stack) : 'bg-gray-700 text-gray-400'"
-                                                        class="px-3 py-1 rounded text-sm hover:opacity-80 transition-opacity flex items-center gap-1">
-                                                    <span x-text="service.icon" class="text-sm"></span>
-                                                    <span x-text="service.name"></span>
-                                                    <span x-show="isAutoAuth(service)" class="text-green-300 text-xs" title="auto-login">↗</span>
-                                                    <span x-show="needsManualLogin(service)" class="text-yellow-300 text-xs" title="manual login">✏️</span>
-                                                    <span x-show="hasKnownAuthType(service) && !isAutoAuth(service) && !needsManualLogin(service)" class="text-gray-300 text-xs" title="external account needed">🔒</span>
-                                                </button>
-                                            </template>
-                                        </div>
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr class="text-gray-500 text-left">
+                                                    <th class="pb-2 font-medium">Service</th>
+                                                    <th class="pb-2 font-medium">Stack</th>
+                                                    <th class="pb-2 font-medium">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <template x-for="service in services" :key="service.id">
+                                                    <tr class="border-t border-gray-700/50">
+                                                        <td class="py-2">
+                                                            <span x-text="service.icon" class="mr-1"></span>
+                                                            <span x-text="service.name"></span>
+                                                        </td>
+                                                        <td class="py-2 text-gray-400" x-text="service.stack || '-'"></td>
+                                                        <td class="py-2">
+                                                            <!-- Not allowed - show Add link -->
+                                                            <template x-if="!hasService(friend, service.id)">
+                                                                <button @click.stop="addServiceToFriend(friend, service)"
+                                                                        class="text-blue-400 hover:text-blue-300">
+                                                                    + Add
+                                                                </button>
+                                                            </template>
+                                                            <!-- Allowed - show status based on service type -->
+                                                            <template x-if="hasService(friend, service.id)">
+                                                                <span>
+                                                                    <!-- Creating account (loading state) -->
+                                                                    <span x-show="creatingAccount[friend.id + '-' + service.id]"
+                                                                          class="text-yellow-400">creating account...</span>
+                                                                    <!-- Has account (managed service with account) -->
+                                                                    <span x-show="!creatingAccount[friend.id + '-' + service.id] && isManagedService(service) && hasAccount(friend, service)"
+                                                                          class="text-green-400">has account</span>
+                                                                    <!-- Allowed but no account needed or not managed -->
+                                                                    <span x-show="!creatingAccount[friend.id + '-' + service.id] && (!isManagedService(service) || !hasAccount(friend, service))"
+                                                                          class="text-gray-400">allowed</span>
+                                                                    <!-- Remove button -->
+                                                                    <button @click.stop="removeServiceFromFriend(friend, service)"
+                                                                            class="ml-2 text-red-400 hover:text-red-300 text-xs"
+                                                                            x-show="!creatingAccount[friend.id + '-' + service.id]">✕</button>
+                                                                </span>
+                                                            </template>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
                                 </div>
                             </div>
                         </template>
@@ -780,6 +813,7 @@
                 editingName: '',
                 editService: null,  // Full service edit modal
                 expandedFriends: {},
+                creatingAccount: {},  // Track loading state for account creation
                 toast: { show: false, message: '' },
 
                 // Activity tracking
@@ -1037,6 +1071,59 @@
 
                 hasService(friend, serviceId) {
                     return friend.services.some(s => s.id === serviceId);
+                },
+
+                hasAccount(friend, service) {
+                    // Check if friend has an account for this managed service
+                    const serviceLower = service.name.toLowerCase();
+                    const accountColumns = {
+                        'plex': 'plex_user_id',
+                        'ombi': 'ombi_user_id',
+                        'jellyfin': 'jellyfin_user_id',
+                        'nextcloud': 'nextcloud_user_id',
+                        'overseerr': 'overseerr_user_id',
+                        'mattermost': 'mattermost_user_id',
+                        'chat': 'mattermost_user_id',
+                    };
+                    const col = accountColumns[serviceLower];
+                    return col && friend[col] && friend[col] !== '';
+                },
+
+                async addServiceToFriend(friend, service) {
+                    const key = friend.id + '-' + service.id;
+                    if (this.isManagedService(service)) {
+                        this.creatingAccount[key] = true;
+                    }
+
+                    const currentIds = friend.services.map(s => s.id);
+                    const newIds = [...currentIds, service.id];
+
+                    try {
+                        const resp = await fetch(`/api/friends/${friend.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ service_ids: newIds })
+                        });
+                        if (resp.ok) {
+                            await this.loadAdminData();
+                        }
+                    } finally {
+                        this.creatingAccount[key] = false;
+                    }
+                },
+
+                async removeServiceFromFriend(friend, service) {
+                    const currentIds = friend.services.map(s => s.id);
+                    const newIds = currentIds.filter(id => id !== service.id);
+
+                    const resp = await fetch(`/api/friends/${friend.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ service_ids: newIds })
+                    });
+                    if (resp.ok) {
+                        await this.loadAdminData();
+                    }
                 },
 
                 async addService() {
