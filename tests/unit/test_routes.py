@@ -306,3 +306,96 @@ class TestForwardAuth:
         assert response.status_code == 200
         assert "X-Remote-User" in response.headers
         assert response.headers["X-Remote-User"] == "admin"
+
+
+# =============================================================================
+# PLEX USER MANAGEMENT TESTS
+# =============================================================================
+
+from unittest.mock import patch, MagicMock
+
+
+class TestPlexUserManagement:
+    """Tests for Plex user management routes."""
+
+    def test_create_plex_user_not_configured(self, client):
+        """Test creating Plex user when Plex isn't configured."""
+        client.post("/api/admin/login", json={"password": "testpassword"})
+
+        # Create a friend first
+        friend_resp = client.post("/api/friends", json={"name": "TestFriend"})
+        friend_id = friend_resp.json()["id"]
+
+        with patch('main.get_plex_account', return_value=None):
+            response = client.post(f"/api/friends/{friend_id}/plex-user")
+            assert response.status_code == 400
+            assert "not configured" in response.json()["detail"]
+
+    def test_create_plex_user_friend_not_found(self, client):
+        """Test creating Plex user for nonexistent friend."""
+        client.post("/api/admin/login", json={"password": "testpassword"})
+
+        with patch('main.get_plex_account', return_value=MagicMock()):
+            response = client.post("/api/friends/99999/plex-user")
+            assert response.status_code == 404
+            assert "not found" in response.json()["detail"]
+
+    def test_create_plex_user_already_exists(self, client):
+        """Test creating Plex user when friend already has one."""
+        client.post("/api/admin/login", json={"password": "testpassword"})
+
+        # Create a friend
+        friend_resp = client.post("/api/friends", json={"name": "TestFriend"})
+        friend_id = friend_resp.json()["id"]
+
+        # Manually set plex_user_id in database
+        import database
+        import asyncio
+        async def set_plex_user():
+            async with await database.get_db() as db:
+                await db.execute(
+                    "UPDATE friends SET plex_user_id = ? WHERE id = ?",
+                    ("existing-plex-id", friend_id)
+                )
+                await db.commit()
+        asyncio.get_event_loop().run_until_complete(set_plex_user())
+
+        with patch('main.get_plex_account', return_value=MagicMock()):
+            response = client.post(f"/api/friends/{friend_id}/plex-user")
+            assert response.status_code == 400
+            assert "already has" in response.json()["detail"]
+
+    def test_delete_plex_user(self, client):
+        """Test removing Plex user association."""
+        client.post("/api/admin/login", json={"password": "testpassword"})
+
+        friend_resp = client.post("/api/friends", json={"name": "TestFriend"})
+        friend_id = friend_resp.json()["id"]
+
+        response = client.delete(f"/api/friends/{friend_id}/plex-user")
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+    def test_update_plex_pin_not_configured(self, client):
+        """Test updating Plex PIN when Plex isn't configured."""
+        client.post("/api/admin/login", json={"password": "testpassword"})
+
+        friend_resp = client.post("/api/friends", json={"name": "TestFriend"})
+        friend_id = friend_resp.json()["id"]
+
+        with patch('main.get_plex_account', return_value=None):
+            response = client.put(f"/api/friends/{friend_id}/plex-pin?pin=1234")
+            assert response.status_code == 400
+            assert "not configured" in response.json()["detail"]
+
+    def test_update_plex_pin_no_plex_user(self, client):
+        """Test updating PIN for friend without Plex user."""
+        client.post("/api/admin/login", json={"password": "testpassword"})
+
+        friend_resp = client.post("/api/friends", json={"name": "TestFriend"})
+        friend_id = friend_resp.json()["id"]
+
+        with patch('main.get_plex_account', return_value=MagicMock()):
+            response = client.put(f"/api/friends/{friend_id}/plex-pin?pin=1234")
+            assert response.status_code == 404
+            assert "no Plex user" in response.json()["detail"]
