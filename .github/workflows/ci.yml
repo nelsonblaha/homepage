@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main, master]
+  repository_dispatch:
+    types: [nelnet-ci-updated]
   # NOTE: pull_request trigger removed for security
   # Self-hosted runners should not run untrusted code from forks
   # See: https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#hardening-for-self-hosted-runners
