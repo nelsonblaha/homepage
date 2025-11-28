@@ -38,32 +38,22 @@ jobs:
   cypress-unit:
     runs-on: self-hosted
     needs: pytest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Kill any stale processes on test ports
+        timeout-minutes: 1
         run: |
           # Kill anything using our test ports (from previous runs)
-          # Try multiple methods since permissions vary
           for port in 5000 8100; do
             echo "Checking port $port..."
-            # Method 1: fuser (most direct)
             fuser -k $port/tcp 2>/dev/null || true
-            # Method 2: lsof + kill
             pid=$(lsof -t -i:$port 2>/dev/null || true)
-            if [ -n "$pid" ]; then
-              echo "Found process $pid on port $port, killing..."
-              kill -9 $pid 2>/dev/null || true
-            fi
-            # Method 3: ss + kill
-            pid=$(ss -tlnp | grep ":$port " | sed 's/.*pid=\([0-9]*\).*/\1/' | head -1)
-            if [ -n "$pid" ]; then
-              echo "Found process $pid via ss on port $port, killing..."
-              kill -9 $pid 2>/dev/null || true
-            fi
+            [ -n "$pid" ] && kill -9 $pid 2>/dev/null || true
           done
-          sleep 3  # Give more time for ports to be released
+          sleep 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -108,32 +98,22 @@ jobs:
   integration-tests:
     runs-on: self-hosted
     needs: cypress-unit
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Kill any stale processes on test ports
+        timeout-minutes: 1
         run: |
           # Kill anything using our test ports (from previous runs)
-          # Try multiple methods since permissions vary
           for port in 5000 8100; do
             echo "Checking port $port..."
-            # Method 1: fuser (most direct)
             fuser -k $port/tcp 2>/dev/null || true
-            # Method 2: lsof + kill
             pid=$(lsof -t -i:$port 2>/dev/null || true)
-            if [ -n "$pid" ]; then
-              echo "Found process $pid on port $port, killing..."
-              kill -9 $pid 2>/dev/null || true
-            fi
-            # Method 3: ss + kill
-            pid=$(ss -tlnp | grep ":$port " | sed 's/.*pid=\([0-9]*\).*/\1/' | head -1)
-            if [ -n "$pid" ]; then
-              echo "Found process $pid via ss on port $port, killing..."
-              kill -9 $pid 2>/dev/null || true
-            fi
+            [ -n "$pid" ] && kill -9 $pid 2>/dev/null || true
           done
-          sleep 3  # Give more time for ports to be released
+          sleep 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
