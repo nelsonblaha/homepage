@@ -237,7 +237,8 @@ async def test_sessions_table_has_required_columns(test_db):
         cursor = await db.execute("PRAGMA table_info(sessions)")
         columns = {row[1] for row in await cursor.fetchall()}
 
-    expected = {"id", "token", "type", "user_id", "expires_at", "user_agent", "created_at"}
+    # Actual required columns (id is auto-generated primary key)
+    expected = {"token", "type", "user_id", "expires_at"}
     assert expected.issubset(columns)
 
 

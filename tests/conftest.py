@@ -2,6 +2,7 @@
 import os
 import sys
 import pytest
+import pytest_asyncio
 import asyncio
 from pathlib import Path
 
@@ -17,7 +18,7 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_db(tmp_path):
     """Create an isolated test database."""
     db_path = tmp_path / "test.db"
