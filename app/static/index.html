@@ -3,7 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Homepage</title>
+    <title id="page-title">Homepage</title>
+    <link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%233b82f6' width='100' height='100' rx='20'/><text x='50' y='72' font-size='60' font-family='system-ui,sans-serif' font-weight='bold' fill='white' text-anchor='middle'>H</text></svg>">
+    <script>
+        // Set page title and favicon based on domain
+        (function() {
+            const domain = window.location.hostname;
+            const letter = domain.charAt(0).toUpperCase();
+            document.title = domain;
+            document.getElementById('favicon').href =
+                `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%233b82f6' width='100' height='100' rx='20'/><text x='50' y='72' font-size='60' font-family='system-ui,sans-serif' font-weight='bold' fill='white' text-anchor='middle'>${letter}</text></svg>`;
+        })();
+    </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
