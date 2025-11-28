@@ -127,6 +127,12 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # Migration: Add visible_to_friends column (defaults to 1/true for backwards compatibility)
+        try:
+            await db.execute("ALTER TABLE services ADD COLUMN visible_to_friends INTEGER DEFAULT 1")
+        except:
+            pass  # Column already exists
+
         # =====================================================================
         # MIGRATIONS FOR friends TABLE
         # =====================================================================

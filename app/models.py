@@ -14,6 +14,7 @@ class ServiceBase(BaseModel):
     auth_type: str = "none"  # none, basic, jellyfin, ombi
     github_repo: str = ""  # GitHub repo for CI status (e.g., "nelsonblaha/homepage")
     quick_join_params: str = ""  # JSON params for quick-join URLs, e.g. {"session": "blaha.io"}
+    visible_to_friends: bool = True  # Whether this service appears in friend assignment UI
 
 class ServiceCreate(ServiceBase):
     pass

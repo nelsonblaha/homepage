@@ -86,6 +86,21 @@ async def toggle_service_default(service_id: int, _: bool = Depends(verify_admin
         return {"status": "ok", "is_default": bool(new_value)}
 
 
+@router.post("/{service_id}/toggle-visibility")
+async def toggle_service_visibility(service_id: int, _: bool = Depends(verify_admin)):
+    """Toggle whether a service is visible for assignment to friends."""
+    async with await get_db() as db:
+        cursor = await db.execute("SELECT visible_to_friends FROM services WHERE id = ?", (service_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Service not found")
+
+        new_value = 0 if row[0] else 1
+        await db.execute("UPDATE services SET visible_to_friends = ? WHERE id = ?", (new_value, service_id))
+        await db.commit()
+        return {"status": "ok", "visible_to_friends": bool(new_value)}
+
+
 @router.get("/{service_id}/preauth-url")
 async def get_preauth_url(service_id: int, _: bool = Depends(verify_admin)):
     """Generate a pre-authenticated URL for a service with embedded basic auth credentials."""

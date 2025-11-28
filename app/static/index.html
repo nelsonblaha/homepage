@@ -392,11 +392,12 @@
                                                     <th class="pb-2 font-medium">Service</th>
                                                     <th class="pb-2 font-medium">Stack</th>
                                                     <th class="pb-2 font-medium">Status</th>
+                                                    <th class="pb-2 font-medium text-center" title="Whether this service is visible to friends">Visible</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <template x-for="service in services" :key="service.id">
-                                                    <tr class="border-t border-gray-700/50">
+                                                <template x-for="service in getSortedServicesForFriend(friend)" :key="service.id">
+                                                    <tr class="border-t border-gray-700/50" :class="{'opacity-50': !service.visible_to_friends}">
                                                         <td class="py-2">
                                                             <span x-text="service.icon" class="mr-1"></span>
                                                             <span x-text="service.name"></span>
@@ -406,7 +407,8 @@
                                                             <!-- Not allowed - show Add link -->
                                                             <template x-if="!hasService(friend, service.id)">
                                                                 <button @click.stop="addServiceToFriend(friend, service)"
-                                                                        class="text-blue-400 hover:text-blue-300">
+                                                                        class="text-blue-400 hover:text-blue-300"
+                                                                        :disabled="!service.visible_to_friends">
                                                                     + Add
                                                                 </button>
                                                             </template>
@@ -428,6 +430,14 @@
                                                                             x-show="!creatingAccount[friend.id + '-' + service.id]">✕</button>
                                                                 </span>
                                                             </template>
+                                                        </td>
+                                                        <td class="py-2 text-center">
+                                                            <button @click.stop="toggleServiceVisibility(service)"
+                                                                    class="text-lg"
+                                                                    :title="service.visible_to_friends ? 'Hide from friends' : 'Show to friends'">
+                                                                <span x-show="service.visible_to_friends">👁️</span>
+                                                                <span x-show="!service.visible_to_friends">🚫</span>
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 </template>
@@ -1122,6 +1132,31 @@
 
                 hasService(friend, serviceId) {
                     return friend.services.some(s => s.id === serviceId);
+                },
+
+                getSortedServicesForFriend(friend) {
+                    // Sort services: 1) services friend has access to first, 2) then by stack, 3) then by name
+                    return [...this.services].sort((a, b) => {
+                        const aHasAccess = this.hasService(friend, a.id) ? 0 : 1;
+                        const bHasAccess = this.hasService(friend, b.id) ? 0 : 1;
+                        if (aHasAccess !== bHasAccess) return aHasAccess - bHasAccess;
+                        // Then sort by stack (empty stacks go last)
+                        const aStack = a.stack || 'zzz';
+                        const bStack = b.stack || 'zzz';
+                        if (aStack !== bStack) return aStack.localeCompare(bStack);
+                        // Finally by name
+                        return a.name.localeCompare(b.name);
+                    });
+                },
+
+                async toggleServiceVisibility(service) {
+                    const resp = await fetch(`/api/services/${service.id}/toggle-visibility`, {
+                        method: 'POST'
+                    });
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        service.visible_to_friends = data.visible_to_friends ? 1 : 0;
+                    }
                 },
 
                 hasAccount(friend, service) {
