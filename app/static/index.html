@@ -326,6 +326,9 @@
                               class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
                               x-text="accessRequests.length"></span>
                     </button>
+                    <button @click="adminTab = 'activity'; loadActivity()" data-testid="tab-activity"
+                            :class="adminTab === 'activity' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
+                            class="px-4 py-2 -mb-px">Activity</button>
                 </div>
 
                 <!-- FRIENDS TAB -->
@@ -436,6 +439,95 @@
                                     </button>
                                 </div>
                             </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- ACTIVITY TAB -->
+                <div x-show="adminTab === 'activity'" data-testid="activity-panel">
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-lg p-4 text-center">
+                            <div class="text-3xl font-bold text-blue-400" x-text="activityStats.page_views || 0"></div>
+                            <div class="text-sm text-gray-400">Page Views</div>
+                            <div class="text-xs text-gray-500">Last <span x-text="activityStats.period_days || 7"></span> days</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 text-center">
+                            <div class="text-3xl font-bold text-green-400" x-text="activityStats.service_clicks || 0"></div>
+                            <div class="text-sm text-gray-400">Service Clicks</div>
+                            <div class="text-xs text-gray-500">Last <span x-text="activityStats.period_days || 7"></span> days</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 text-center">
+                            <div class="text-3xl font-bold text-purple-400" x-text="activityStats.active_friends || 0"></div>
+                            <div class="text-sm text-gray-400">Active Friends</div>
+                            <div class="text-xs text-gray-500">Last <span x-text="activityStats.period_days || 7"></span> days</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4 text-center">
+                            <div class="text-3xl font-bold text-yellow-400" x-text="friends.length || 0"></div>
+                            <div class="text-sm text-gray-400">Total Friends</div>
+                            <div class="text-xs text-gray-500">All time</div>
+                        </div>
+                    </div>
+
+                    <!-- Top Services & Friends -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-gray-800 rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-300">Top Services</h3>
+                            <template x-if="activityStats.top_services && activityStats.top_services.length > 0">
+                                <div class="space-y-2">
+                                    <template x-for="svc in activityStats.top_services" :key="svc.name">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-300" x-text="svc.name"></span>
+                                            <span class="text-blue-400 font-semibold" x-text="svc.clicks + ' clicks'"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="!activityStats.top_services || activityStats.top_services.length === 0">
+                                <div class="text-gray-500 text-sm">No activity yet</div>
+                            </template>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-4">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-300">Most Active Friends</h3>
+                            <template x-if="activityStats.top_friends && activityStats.top_friends.length > 0">
+                                <div class="space-y-2">
+                                    <template x-for="friend in activityStats.top_friends" :key="friend.name">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-300" x-text="friend.name"></span>
+                                            <span class="text-green-400 font-semibold" x-text="friend.visits + ' visits'"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="!activityStats.top_friends || activityStats.top_friends.length === 0">
+                                <div class="text-gray-500 text-sm">No activity yet</div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Recent Activity Log -->
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold text-gray-300">Recent Activity</h3>
+                            <button @click="loadActivity()" class="text-sm text-blue-400 hover:text-blue-300">Refresh</button>
+                        </div>
+                        <template x-if="activityLog.length > 0">
+                            <div class="space-y-2 max-h-96 overflow-y-auto">
+                                <template x-for="entry in activityLog" :key="entry.id">
+                                    <div class="flex items-center gap-3 py-2 border-b border-gray-700 last:border-0">
+                                        <span class="text-lg" x-text="getActivityIcon(entry.action)"></span>
+                                        <div class="flex-1">
+                                            <span class="text-gray-300" x-text="entry.friend_name || 'Unknown'"></span>
+                                            <span class="text-gray-500" x-text="getActivityVerb(entry.action)"></span>
+                                            <span x-show="entry.service_name" class="text-blue-400" x-text="entry.service_name"></span>
+                                        </div>
+                                        <div class="text-xs text-gray-500" x-text="timeAgo(entry.created_at)"></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="activityLog.length === 0">
+                            <div class="text-gray-500 text-center py-8">No activity recorded yet</div>
                         </template>
                     </div>
                 </div>
@@ -591,6 +683,10 @@
                 expandedFriends: {},
                 toast: { show: false, message: '' },
 
+                // Activity tracking
+                activityStats: {},
+                activityLog: [],
+
                 // Base domain (derived from current hostname)
                 baseDomain: window.location.hostname,
 
@@ -698,6 +794,43 @@
                     this.friends = await friendsResp.json();
                     this.accessRequests = await requestsResp.json();
                     await this.checkAllStatus();
+                },
+
+                async loadActivity() {
+                    try {
+                        const [statsResp, logResp] = await Promise.all([
+                            fetch('/api/activity/stats'),
+                            fetch('/api/activity?limit=50')
+                        ]);
+                        if (statsResp.ok) {
+                            this.activityStats = await statsResp.json();
+                        }
+                        if (logResp.ok) {
+                            this.activityLog = await logResp.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load activity:', e);
+                    }
+                },
+
+                getActivityIcon(action) {
+                    const icons = {
+                        'page_view': '👁️',
+                        'service_click': '🔗',
+                        'auth_login': '🔐',
+                        'credential_view': '🔑'
+                    };
+                    return icons[action] || '📝';
+                },
+
+                getActivityVerb(action) {
+                    const verbs = {
+                        'page_view': 'visited homepage',
+                        'service_click': 'clicked',
+                        'auth_login': 'logged in',
+                        'credential_view': 'viewed credentials for'
+                    };
+                    return verbs[action] || action;
                 },
 
                 async checkAllStatus() {
