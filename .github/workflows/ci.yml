@@ -26,7 +26,7 @@ jobs:
       - name: Install test dependencies
         run: pip install -r requirements-test.txt
 
-      - name: Run pytest unit tests
+      - name: Run pytest unit tests with coverage
         env:
           ADMIN_PASSWORD: testpassword
           SESSION_SECRET: testsecret1234567890abcdef
@@ -34,7 +34,7 @@ jobs:
           COOKIE_DOMAIN: ""
         run: |
           cd app
-          pytest ../tests/unit/ -v --tb=short
+          pytest ../tests/unit/ -v --tb=short --cov=. --cov-report=term-missing --cov-fail-under=50
 
   # Cypress E2E tests without external dependencies
   cypress-unit:
