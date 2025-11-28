@@ -1,4 +1,4 @@
-"""blaha.io - Homepage and friend access management"""
+"""Homepage - Friend access portal and service management"""
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="blaha.io", lifespan=lifespan)
+app = FastAPI(title="Homepage", lifespan=lifespan)
 
 # Include all routers
 app.include_router(auth_router)
@@ -184,15 +184,19 @@ async def friend_page(token: str, response: Response):
             raise HTTPException(status_code=404, detail="Invalid link")
 
     # Set cookie for SSO across subdomains
-    response.set_cookie(
-        key="friend_token",
-        value=token,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        domain=".blaha.io",
-        max_age=86400 * 30
-    )
+    import os
+    cookie_domain = os.environ.get("COOKIE_DOMAIN", "")
+    cookie_kwargs = {
+        "key": "friend_token",
+        "value": token,
+        "httponly": True,
+        "secure": True,
+        "samesite": "lax",
+        "max_age": 86400 * 30
+    }
+    if cookie_domain and cookie_domain != "localhost":
+        cookie_kwargs["domain"] = cookie_domain
+    response.set_cookie(**cookie_kwargs)
     return FileResponse("static/index.html")
 
 

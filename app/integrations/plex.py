@@ -1,4 +1,4 @@
-"""Plex integration for blaha.io"""
+"""Plex integration - managed user creation and library access"""
 import os
 from fastapi import APIRouter, HTTPException, Depends
 

@@ -1,4 +1,4 @@
-"""Access request routes for blaha.io"""
+"""Access request routes - friends requesting service access"""
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Cookie
 

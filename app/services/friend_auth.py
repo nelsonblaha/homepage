@@ -208,7 +208,7 @@ def verify_totp(secret: str, code: str, window: int = 1) -> bool:
         return False
 
 
-def get_totp_uri(secret: str, username: str, issuer: str = "blaha.io") -> str:
+def get_totp_uri(secret: str, username: str, issuer: str = None) -> str:
     """
     Generate otpauth:// URI for QR code generation.
 
@@ -221,6 +221,8 @@ def get_totp_uri(secret: str, username: str, issuer: str = "blaha.io") -> str:
         otpauth:// URI for QR code
     """
     from urllib.parse import quote
+    if issuer is None:
+        issuer = os.environ.get("BASE_DOMAIN", "Homepage")
     return f"otpauth://totp/{quote(issuer)}:{quote(username)}?secret={secret}&issuer={quote(issuer)}"
 
 

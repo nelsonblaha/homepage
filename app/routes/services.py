@@ -1,4 +1,4 @@
-"""Service management routes for blaha.io"""
+"""Service management routes - CRUD for services"""
 import os
 from fastapi import APIRouter, HTTPException, Depends
 
@@ -6,8 +6,9 @@ from database import get_db
 from models import Service, ServiceCreate
 from services.session import verify_admin
 
-BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "ben")
+BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "admin")
 BASIC_AUTH_PASS = os.environ.get("BASIC_AUTH_PASS", "")
+BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -93,6 +94,6 @@ async def get_preauth_url(service_id: int, _: bool = Depends(verify_admin)):
         from urllib.parse import quote
         user = quote(BASIC_AUTH_USER, safe='')
         passwd = quote(BASIC_AUTH_PASS, safe='')
-        preauth_url = f"https://{user}:{passwd}@{service['subdomain']}.blaha.io/"
+        preauth_url = f"https://{user}:{passwd}@{service['subdomain']}.{BASE_DOMAIN}/"
 
         return {"url": preauth_url, "service": service["name"]}

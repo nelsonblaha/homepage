@@ -8,7 +8,7 @@ class ServiceBase(BaseModel):
     icon: str = ""
     description: str = ""
     display_order: int = 0
-    subdomain: str = ""  # For SSO: e.g., "ombi" for ombi.blaha.io
+    subdomain: str = ""  # For SSO: e.g., "ombi" for ombi.yourdomain.com
     stack: str = ""  # Docker stack: media, infra, jitsi, priorities, etc.
     is_default: bool = False  # Auto-grant to new friends
     auth_type: str = "none"  # none, basic, jellyfin, ombi

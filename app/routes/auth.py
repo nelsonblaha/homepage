@@ -1,4 +1,4 @@
-"""Authentication routes for blaha.io"""
+"""Authentication routes - admin login and service SSO"""
 import os
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Response, Cookie, Request, Header, Form

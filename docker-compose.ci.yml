@@ -25,12 +25,13 @@ services:
 
   jellyfin:
     image: linuxserver/jellyfin:latest
+    container_name: jellyfin-ci-${CI_RUN_ID:-local}
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=America/Chicago
     ports:
-      - "8196:8096"  # CI port (production uses 8096)
+      - "${JELLYFIN_PORT:-8196}:8096"
     volumes:
       - jellyfin-ci-config:/config
     healthcheck:
@@ -41,15 +42,17 @@ services:
       start_period: 90s
     networks:
       - ci-network
+      - shared
 
   overseerr:
     image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr-ci-${CI_RUN_ID:-local}
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=America/Chicago
     ports:
-      - "5155:5055"  # CI port (production uses 5055)
+      - "${OVERSEERR_PORT:-5155}:5055"
     volumes:
       - overseerr-ci-config:/config
     healthcheck:
@@ -60,11 +63,13 @@ services:
       start_period: 90s
     networks:
       - ci-network
+      - shared
 
   mattermost:
     image: mattermost/mattermost-preview:latest
+    container_name: mattermost-ci-${CI_RUN_ID:-local}
     ports:
-      - "8165:8065"  # CI port (production uses 8065)
+      - "${MATTERMOST_PORT:-8165}:8065"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8065/api/v4/system/ping"]
       interval: 15s
@@ -73,15 +78,17 @@ services:
       start_period: 90s
     networks:
       - ci-network
+      - shared
 
   nextcloud:
     image: linuxserver/nextcloud:latest
+    container_name: nextcloud-ci-${CI_RUN_ID:-local}
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=America/Chicago
     ports:
-      - "8186:443"  # CI port (production uses 8086)
+      - "${NEXTCLOUD_PORT:-8186}:443"
     volumes:
       - nextcloud-ci-config:/config
       - nextcloud-ci-data:/data
@@ -93,6 +100,7 @@ services:
       start_period: 120s
     networks:
       - ci-network
+      - shared
 
 volumes:
   ombi-ci-config:

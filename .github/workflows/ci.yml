@@ -8,7 +8,9 @@ on:
 
 env:
   # Unique project name per run to avoid conflicts
-  CI_PROJECT: blaha-ci-${{ github.run_id }}
+  CI_PROJECT: homepage-ci-${{ github.run_id }}
+  # Production deploy path (customize for your server)
+  DEPLOY_PATH: /home/ben/docker/blaha-homepage
 
 jobs:
   # Fast Python unit tests (pytest)
@@ -247,23 +249,21 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Sync code to production directory
+      - name: Deploy to production
         run: |
-          # Copy checked-out code to production directory (excluding .git and data)
-          rsync -av --delete \
-            --exclude '.git' \
-            --exclude 'data/' \
-            --exclude '.env' \
-            --exclude '.env.webhook' \
-            --exclude '__pycache__' \
-            --exclude 'node_modules' \
-            $GITHUB_WORKSPACE/ /home/ben/docker/blaha-homepage/
+          cd $DEPLOY_PATH
 
-      - name: Deploy containers
-        run: |
-          cd /home/ben/docker/blaha-homepage
+          # Add GitHub's SSH host key (runner containers are ephemeral)
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Mark directory as safe (runner user differs from owner)
+          git config --global --add safe.directory $DEPLOY_PATH
+
+          # Pull latest code
+          git pull origin main
+
+          # Rebuild and restart containers
           docker compose down
           docker compose up -d --build
           echo "Deploy complete!"

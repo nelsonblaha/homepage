@@ -1,4 +1,4 @@
-"""Friend management routes for blaha.io"""
+"""Friend management routes - CRUD and service access"""
 import secrets
 from datetime import datetime
 from typing import Optional

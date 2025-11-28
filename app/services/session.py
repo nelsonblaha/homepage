@@ -1,4 +1,4 @@
-"""Session management for blaha.io"""
+"""Session management - admin and friend authentication"""
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional

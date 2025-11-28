@@ -1,4 +1,4 @@
-"""Jitsi integration for blaha.io - participant count tracking"""
+"""Jitsi integration - participant count tracking"""
 import os
 import httpx
 from fastapi import APIRouter

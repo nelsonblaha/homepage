@@ -1,4 +1,4 @@
-"""Mastodon integration for blaha.io - user management via tootctl CLI"""
+"""Mastodon integration - user management via tootctl CLI"""
 import asyncio
 import os
 from fastapi import APIRouter, Depends
@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends
 from services.session import verify_admin
 
 MASTODON_CONTAINER = os.environ.get("MASTODON_CONTAINER", "mastodon-web")
-MASTODON_DOMAIN = os.environ.get("MASTODON_DOMAIN", "social.blaha.io")
+MASTODON_DOMAIN = os.environ.get("MASTODON_DOMAIN", "localhost")
+BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
 
 router = APIRouter(prefix="/api/mastodon", tags=["mastodon"])
 
@@ -30,7 +31,7 @@ async def create_mastodon_user(username: str) -> dict | None:
     """Create a Mastodon user. Returns user info including password."""
     # Mastodon username: lowercase, alphanumeric + underscores only
     safe_username = username.lower().replace(' ', '_')
-    email = f"{safe_username}@blaha.io"
+    email = f"{safe_username}@{BASE_DOMAIN}"
 
     # Create the user with --confirmed and --approve flags
     success, output = await run_tootctl(f"accounts create {safe_username} --email={email} --confirmed --approve")
@@ -88,7 +89,7 @@ async def reset_mastodon_password(username: str) -> dict | None:
         print(f"Mastodon: could not parse password from: {output}")
         return None
 
-    email = f"{username}@blaha.io"
+    email = f"{username}@{BASE_DOMAIN}"
     # Return full Mastodon handle for display (username@domain)
     full_handle = f"{username}@{MASTODON_DOMAIN}"
     return {
