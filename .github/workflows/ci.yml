@@ -254,7 +254,10 @@ jobs:
           # Deploy using the mounted production directory
           cd /home/ben/docker/blaha-homepage
 
-          # Pull latest (already checked out by this workflow, but sync mounted dir)
+          # Mark directory as safe (runner user differs from owner)
+          git config --global --add safe.directory /home/ben/docker/blaha-homepage
+
+          # Pull latest
           git pull origin main
 
           # Rebuild and restart the container
