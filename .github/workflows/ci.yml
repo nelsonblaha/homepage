@@ -247,12 +247,16 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
-      - name: Deploy to production
+      - name: Trigger deploy webhook
         env:
-          # Production path on nelnet server
-          DEPLOY_PATH: /home/ben/docker/blaha-homepage
+          WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
         run: |
-          cd "$DEPLOY_PATH"
-          git pull origin main || true
-          docker compose down
-          docker compose up -d --build
+          # Calculate HMAC signature
+          PAYLOAD='{"ref":"${{ github.ref }}","sha":"${{ github.sha }}"}'
+          SIGNATURE="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)"
+
+          # Call webhook on localhost
+          curl -sf -X POST http://127.0.0.1:9000/deploy \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: $SIGNATURE" \
+            -d "$PAYLOAD"
