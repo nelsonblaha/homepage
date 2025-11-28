@@ -84,17 +84,19 @@ jobs:
           docker compose -p $CI_PROJECT -f docker-compose.ci.yml up -d ombi
           echo "Waiting for Ombi to become healthy..."
 
-      - name: Wait for Ombi
+      - name: Wait for Ombi API
         run: |
+          echo "Waiting for Ombi API to be ready..."
           for i in $(seq 1 120); do
-            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3580/ | grep -q "200\|302"; then
-              echo "Ombi is ready after $i attempts"
+            # Check the actual API endpoint the setup script uses
+            if curl -s "http://localhost:3580/api/v1/Settings/About" | grep -q "version"; then
+              echo "Ombi API is ready after $i attempts"
               exit 0
             fi
-            echo "Attempt $i/120 - Ombi not ready yet..."
+            echo "Attempt $i/120 - Ombi API not ready yet..."
             sleep 5
           done
-          echo "ERROR: Ombi failed to start after 10 minutes"
+          echo "ERROR: Ombi API failed to start after 10 minutes"
           docker compose -p $CI_PROJECT -f docker-compose.ci.yml logs ombi
           exit 1
 
