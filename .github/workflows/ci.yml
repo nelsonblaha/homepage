@@ -248,11 +248,20 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Deploy to production
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          # Deploy using the checked-out code
+          cd "$DEPLOY_PATH"
+
+          # Mark directory as safe (runner user differs from owner)
+          git config --global --add safe.directory "$DEPLOY_PATH"
+
+          # Pull latest code
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Rebuild and restart containers
           docker compose down
           docker compose up -d --build
           echo "Deploy complete!"
