@@ -11,8 +11,16 @@ from integrations.registry import (
     get_db_columns,
     handle_service_grant_v2,
     handle_service_revoke_v2,
+    SERVICE_DB_COLUMNS,
 )
 from integrations.plex import create_plex_user, delete_plex_user
+
+
+# =============================================================================
+# BACKWARDS-COMPATIBLE EXPORT
+# =============================================================================
+# Maps service slugs to their user_id column name (for friends.py compatibility)
+MANAGED_SERVICES = {slug: cols[0] for slug, cols in SERVICE_DB_COLUMNS.items()}
 
 
 async def handle_service_grant(friend_id: int, friend_name: str, service_name: str, db) -> dict:
