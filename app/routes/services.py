@@ -204,6 +204,9 @@ async def get_integrations_summary(_: bool = Depends(verify_admin)):
         return summary
 
 
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+
+
 @router.get("/ci-status")
 async def get_ci_status(_: bool = Depends(verify_admin)):
     """Get GitHub Actions CI status for all services with github_repo configured."""
@@ -217,15 +220,19 @@ async def get_ci_status(_: bool = Depends(verify_admin)):
         services = await cursor.fetchall()
 
     results = {}
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"token {GITHUB_TOKEN}"
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         for service in services:
             repo = service["github_repo"]
             try:
-                # Fetch latest workflow run from GitHub API (public repos, no auth needed)
+                # Fetch latest workflow run from GitHub API
                 resp = await client.get(
                     f"https://api.github.com/repos/{repo}/actions/runs",
                     params={"per_page": 1, "branch": "main"},
-                    headers={"Accept": "application/vnd.github.v3+json"}
+                    headers=headers
                 )
                 if resp.status_code == 200:
                     data = resp.json()
@@ -244,7 +251,7 @@ async def get_ci_status(_: bool = Depends(verify_admin)):
                     resp = await client.get(
                         f"https://api.github.com/repos/{repo}/actions/runs",
                         params={"per_page": 1, "branch": "master"},
-                        headers={"Accept": "application/vnd.github.v3+json"}
+                        headers=headers
                     )
                     if resp.status_code == 200:
                         data = resp.json()
