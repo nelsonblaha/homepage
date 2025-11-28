@@ -48,8 +48,7 @@ describe('API Endpoints', () => {
     })
   })
 
-  // Skip authenticated tests until CI env var issue is resolved
-  describe.skip('Authenticated endpoints', () => {
+  describe('Authenticated endpoints', () => {
     beforeEach(() => {
       cy.adminLogin()
     })

@@ -1,5 +1,4 @@
-// Skip all service management tests until CI env var issue is resolved
-describe.skip('Service Management', () => {
+describe('Service Management', () => {
   beforeEach(() => {
     cy.adminLogin()
     cy.get('[data-testid="tab-services"]').click()

@@ -15,8 +15,7 @@ describe('Admin Authentication', () => {
   })
 })
 
-// Skip authenticated admin tests until CI env var issue is resolved
-describe.skip('Admin Dashboard', () => {
+describe('Admin Dashboard', () => {
   beforeEach(() => {
     cy.adminLogin()
   })
