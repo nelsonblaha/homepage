@@ -27,10 +27,10 @@ async def list_services(_: bool = Depends(verify_admin)):
 async def create_service(service: ServiceCreate, _: bool = Depends(verify_admin)):
     async with await get_db() as db:
         cursor = await db.execute(
-            """INSERT INTO services (name, url, icon, description, display_order, subdomain, stack, is_default)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO services (name, url, icon, description, display_order, subdomain, stack, is_default, auth_type)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (service.name, service.url, service.icon, service.description, service.display_order,
-             service.subdomain, service.stack, 1 if service.is_default else 0)
+             service.subdomain, service.stack, 1 if service.is_default else 0, service.auth_type)
         )
         await db.commit()
         return Service(id=cursor.lastrowid, **service.model_dump())
@@ -41,9 +41,9 @@ async def update_service(service_id: int, service: ServiceCreate, _: bool = Depe
     async with await get_db() as db:
         await db.execute(
             """UPDATE services SET name=?, url=?, icon=?, description=?, display_order=?,
-               subdomain=?, stack=?, is_default=? WHERE id=?""",
+               subdomain=?, stack=?, is_default=?, auth_type=? WHERE id=?""",
             (service.name, service.url, service.icon, service.description, service.display_order,
-             service.subdomain, service.stack, 1 if service.is_default else 0, service_id)
+             service.subdomain, service.stack, 1 if service.is_default else 0, service.auth_type, service_id)
         )
         await db.commit()
         return Service(id=service_id, **service.model_dump())

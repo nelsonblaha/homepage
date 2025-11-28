@@ -293,7 +293,7 @@ async def unified_auth_redirect(subdomain: str, admin_token: Optional[str] = Coo
         elif auth_type == "overseerr":
             return await _auth_overseerr(friend)
         else:
-            return RedirectResponse(url=f"https://{subdomain}.blaha.io/", status_code=302)
+            return RedirectResponse(url=f"https://{subdomain}.{BASE_DOMAIN}/", status_code=302)
 
 
 # Legacy endpoint for backwards compatibility
