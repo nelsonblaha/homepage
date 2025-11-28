@@ -680,6 +680,7 @@
                             <input type="text" x-model="newService.description" placeholder="Description"
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
                             <input type="text" x-model="newService.subdomain" placeholder="Subdomain (e.g. ombi)"
+                                   title="For nginx forward auth: set subdomain here and configure nginx location_block for subdomain.yourdomain.com with auth_request to /api/auth/forward-auth"
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
                             <input type="text" x-model="newService.github_repo" placeholder="GitHub repo (e.g. nelsonblaha/homepage)"
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
@@ -726,6 +727,7 @@
                         <div>
                             <label class="block text-sm text-gray-400 mb-1">Subdomain</label>
                             <input type="text" x-model="editService.subdomain" placeholder="e.g. ombi"
+                                   title="For nginx forward auth: set subdomain here and configure nginx location_block for subdomain.yourdomain.com with auth_request to /api/auth/forward-auth"
                                    class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
                         </div>
                     </div>
