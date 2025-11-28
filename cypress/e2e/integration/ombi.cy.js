@@ -78,12 +78,19 @@ describe('Ombi E2E Integration', () => {
       cy.get('[data-testid="new-friend-input"]').type(testFriendName)
       cy.get('[data-testid="add-friend-btn"]').click()
 
-      // Wait for friend to appear in list
-      cy.contains(testFriendName).should('be.visible')
+      // Wait for friend to appear in list (collapsible card structure)
+      cy.contains('h4', testFriendName).should('be.visible')
 
-      // Get the friend's link from the table
-      cy.contains(testFriendName)
-        .parent('tr')
+      // Click to expand the friend card to reveal the link
+      cy.contains('h4', testFriendName)
+        .closest('.bg-gray-800')  // Find the card container
+        .find('button')
+        .first()
+        .click()
+
+      // Get the friend's link from the expanded card
+      cy.contains('h4', testFriendName)
+        .closest('.bg-gray-800')
         .find('[data-testid="friend-link"]')
         .invoke('attr', 'href')
         .then((href) => {
