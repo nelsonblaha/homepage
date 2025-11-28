@@ -153,18 +153,27 @@ jobs:
       - name: Start test containers
         env:
           CI_RUN_ID: ${{ github.run_id }}
+          OMBI_PORT: ${{ env.OMBI_PORT }}
         run: |
+          echo "Starting Ombi on port $OMBI_PORT..."
           docker compose -p $CI_PROJECT -f docker-compose.ci.yml up -d ombi
           echo "Waiting for Ombi to become healthy..."
 
       - name: Wait for Ombi API
+        env:
+          OMBI_PORT: ${{ env.OMBI_PORT }}
         run: |
           # Use Docker bridge gateway IP to reach host services from containerized runner
           OMBI_HOST="${DOCKER_HOST_IP:-172.17.0.1}"
           echo "Waiting for Ombi API to be ready at $OMBI_HOST:$OMBI_PORT..."
+
+          # First verify container is running
+          docker ps | grep ombi || echo "WARNING: No Ombi container found!"
+
           for i in $(seq 1 120); do
             # Use /api/v1/Status - it's public and returns 200 when ready
-            if curl -s "http://$OMBI_HOST:$OMBI_PORT/api/v1/Status" | grep -q "200"; then
+            # Add 5 second timeout to curl
+            if curl -s --max-time 5 "http://$OMBI_HOST:$OMBI_PORT/api/v1/Status" | grep -q "200"; then
               echo "Ombi API is ready after $i attempts"
               exit 0
             fi
@@ -220,8 +229,13 @@ jobs:
 
       - name: Cleanup
         if: always()
+        env:
+          CI_RUN_ID: ${{ github.run_id }}
         run: |
           docker compose -p $CI_PROJECT -f docker-compose.ci.yml down -v --remove-orphans || true
+          docker network rm blaha-ci-isolated-${{ github.run_id }} 2>/dev/null || true
+          # Clean up CI-specific volumes
+          docker volume rm ombi-ci-config-${{ github.run_id }} 2>/dev/null || true
           pkill -f "uvicorn main:app" || true
           rm -f /tmp/test-integration-${{ github.run_id }}.db /tmp/test-unit-${{ github.run_id }}.db
 

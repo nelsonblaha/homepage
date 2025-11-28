@@ -308,3 +308,301 @@ class TestIntegrationNotConfigured:
         result = await integrations.jellyfin.jellyfin_integration.create_user("test")
         assert result.success is False
         assert "not configured" in result.error.lower()
+
+
+# =============================================================================
+# MATTERMOST INTEGRATION TESTS
+# =============================================================================
+
+class TestMattermostIntegration:
+    """Tests for Mattermost integration with mocked HTTP."""
+
+    @pytest.fixture
+    def mm_env(self, monkeypatch):
+        """Set up Mattermost-specific environment variables."""
+        monkeypatch.setenv("BASE_DOMAIN", "test.local")
+        monkeypatch.setenv("COOKIE_DOMAIN", ".test.local")
+        monkeypatch.setenv("MATTERMOST_URL", "http://localhost:8065")
+        monkeypatch.setenv("MATTERMOST_TOKEN", "testtoken123")
+        monkeypatch.setenv("MATTERMOST_TEAM_ID", "team-uuid-123")
+
+    @pytest.mark.asyncio
+    async def test_create_user_success(self, mm_env):
+        """Test successful Mattermost user creation."""
+        from integrations.mattermost import mattermost_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+
+            # Mock user creation and team add
+            mock_ctx.post.side_effect = [
+                make_mock_response(200, {"id": "user-uuid-123", "username": "testuser"}),
+                make_mock_response(200)  # Team add
+            ]
+
+            result = await mattermost_integration.create_user("testuser")
+
+            assert result.success is True
+            assert result.user_id == "user-uuid-123"
+            assert result.password is not None
+
+    @pytest.mark.asyncio
+    async def test_create_user_failure(self, mm_env):
+        """Test Mattermost user creation failure."""
+        from integrations.mattermost import mattermost_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.post.return_value = make_mock_response(
+                status_code=400,
+                text="User already exists"
+            )
+
+            result = await mattermost_integration.create_user("existinguser")
+
+            assert result.success is False
+            assert "400" in result.error
+
+    @pytest.mark.asyncio
+    async def test_delete_user_success(self, mm_env):
+        """Test successful Mattermost user deletion."""
+        from integrations.mattermost import mattermost_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.delete.return_value = make_mock_response(status_code=200)
+
+            result = await mattermost_integration.delete_user("user-uuid-123")
+
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_delete_user_failure(self, mm_env):
+        """Test Mattermost user deletion failure."""
+        from integrations.mattermost import mattermost_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.delete.return_value = make_mock_response(status_code=404)
+
+            result = await mattermost_integration.delete_user("nonexistent")
+
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_authenticate_success(self, mm_env):
+        """Test successful Mattermost authentication with header token."""
+        from integrations.mattermost import mattermost_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.headers = {"Token": "session-token-abc"}
+            mock_ctx.post.return_value = mock_response
+
+            result = await mattermost_integration.authenticate("user@test.local", "pass")
+
+            assert result.success is True
+            assert result.access_token == "session-token-abc"
+            assert "MMAUTHTOKEN" in result.cookies
+
+    @pytest.mark.asyncio
+    async def test_authenticate_failure(self, mm_env):
+        """Test failed Mattermost authentication."""
+        from integrations.mattermost import mattermost_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.post.return_value = make_mock_response(status_code=401)
+
+            result = await mattermost_integration.authenticate("user@test.local", "wrong")
+
+            assert result.success is False
+
+    @pytest.mark.asyncio
+    async def test_check_status_connected(self, mm_env):
+        """Test Mattermost status check when connected."""
+        from integrations.mattermost import mattermost_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.get.return_value = make_mock_response(status_code=200)
+
+            result = await mattermost_integration.check_status()
+
+            assert result.connected is True
+            assert result.server_name == "Mattermost"
+
+
+# =============================================================================
+# NEXTCLOUD INTEGRATION TESTS
+# =============================================================================
+
+class TestNextcloudIntegration:
+    """Tests for Nextcloud integration with mocked HTTP."""
+
+    @pytest.fixture
+    def nc_env(self, monkeypatch):
+        """Set up Nextcloud-specific environment variables."""
+        monkeypatch.setenv("BASE_DOMAIN", "test.local")
+        monkeypatch.setenv("COOKIE_DOMAIN", ".test.local")
+        monkeypatch.setenv("NEXTCLOUD_URL", "https://localhost:8443")
+        monkeypatch.setenv("NEXTCLOUD_ADMIN_USER", "admin")
+        monkeypatch.setenv("NEXTCLOUD_ADMIN_PASS", "adminpass")
+        monkeypatch.setenv("NEXTCLOUD_HOST", "nextcloud.test.local")
+
+    @pytest.mark.asyncio
+    async def test_create_user_success(self, nc_env):
+        """Test successful Nextcloud user creation."""
+        from integrations.nextcloud import nextcloud_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+
+            # OCS success response
+            xml_response = """<?xml version="1.0"?>
+            <ocs><meta><statuscode>100</statuscode></meta></ocs>"""
+            mock_ctx.post.return_value = make_mock_response(200, text=xml_response)
+
+            result = await nextcloud_integration.create_user("testuser")
+
+            assert result.success is True
+            assert result.user_id == "testuser"  # Nextcloud uses username as ID
+            assert result.password is not None
+
+    @pytest.mark.asyncio
+    async def test_create_user_failure(self, nc_env):
+        """Test Nextcloud user creation failure."""
+        from integrations.nextcloud import nextcloud_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+
+            # OCS failure response
+            xml_response = """<?xml version="1.0"?>
+            <ocs><meta><statuscode>102</statuscode><message>User already exists</message></meta></ocs>"""
+            mock_ctx.post.return_value = make_mock_response(200, text=xml_response)
+
+            result = await nextcloud_integration.create_user("existinguser")
+
+            assert result.success is False
+            assert "User already exists" in result.error
+
+    @pytest.mark.asyncio
+    async def test_delete_user_success(self, nc_env):
+        """Test successful Nextcloud user deletion."""
+        from integrations.nextcloud import nextcloud_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+
+            xml_response = """<?xml version="1.0"?>
+            <ocs><meta><statuscode>100</statuscode></meta></ocs>"""
+            mock_ctx.delete.return_value = make_mock_response(200, text=xml_response)
+
+            result = await nextcloud_integration.delete_user("testuser")
+
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_delete_user_failure(self, nc_env):
+        """Test Nextcloud user deletion failure."""
+        from integrations.nextcloud import nextcloud_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.delete.return_value = make_mock_response(status_code=404)
+
+            result = await nextcloud_integration.delete_user("nonexistent")
+
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_authenticate_success(self, nc_env):
+        """Test Nextcloud credential validation."""
+        from integrations.nextcloud import nextcloud_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.get.return_value = make_mock_response(status_code=200)
+
+            result = await nextcloud_integration.authenticate("user", "pass")
+
+            assert result.success is True
+            assert result.extra["valid"] is True
+
+    @pytest.mark.asyncio
+    async def test_authenticate_failure(self, nc_env):
+        """Test Nextcloud authentication failure."""
+        from integrations.nextcloud import nextcloud_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.get.return_value = make_mock_response(status_code=401)
+
+            result = await nextcloud_integration.authenticate("user", "wrong")
+
+            assert result.success is False
+
+    @pytest.mark.asyncio
+    async def test_check_status_connected(self, nc_env):
+        """Test Nextcloud status check when connected."""
+        from integrations.nextcloud import nextcloud_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.get.return_value = make_mock_response(status_code=200)
+
+            result = await nextcloud_integration.check_status()
+
+            assert result.connected is True
+            assert result.server_name == "Nextcloud"
+
+    def test_parse_ocs_response_success(self, nc_env):
+        """Test OCS XML parsing for success response."""
+        from integrations.nextcloud import nextcloud_integration
+
+        xml = """<?xml version="1.0"?>
+        <ocs><meta><statuscode>100</statuscode></meta></ocs>"""
+
+        success, message = nextcloud_integration._parse_ocs_response(xml)
+
+        assert success is True
+        assert message == "OK"
+
+    def test_parse_ocs_response_failure(self, nc_env):
+        """Test OCS XML parsing for failure response."""
+        from integrations.nextcloud import nextcloud_integration
+
+        xml = """<?xml version="1.0"?>
+        <ocs><meta><statuscode>102</statuscode><message>User already exists</message></meta></ocs>"""
+
+        success, message = nextcloud_integration._parse_ocs_response(xml)
+
+        assert success is False
+        assert message == "User already exists"
+
+    def test_parse_ocs_response_invalid_xml(self, nc_env):
+        """Test OCS XML parsing with invalid XML."""
+        from integrations.nextcloud import nextcloud_integration
+
+        success, message = nextcloud_integration._parse_ocs_response("not xml")
+
+        assert success is False
+        assert "Invalid XML" in message
