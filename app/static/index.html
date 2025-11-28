@@ -664,6 +664,92 @@
                 </div>
             </div>
         </template>
+
+        <!-- Edit Service Modal -->
+        <div x-show="editService" x-cloak
+             class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+             @click.self="cancelEditService()">
+            <div class="bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-xl font-semibold mb-4">Edit Service</h3>
+                <form @submit.prevent="saveEditService()" class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Name</label>
+                        <input type="text" x-model="editService.name" required
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">URL</label>
+                        <input type="url" x-model="editService.url" required
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Icon (emoji)</label>
+                            <input type="text" x-model="editService.icon"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Subdomain</label>
+                            <input type="text" x-model="editService.subdomain" placeholder="e.g. ombi"
+                                   class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">Description</label>
+                        <input type="text" x-model="editService.description"
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Stack</label>
+                            <select x-model="editService.stack"
+                                    class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="">None</option>
+                                <option value="media">Media</option>
+                                <option value="social">Social</option>
+                                <option value="infra">Infrastructure</option>
+                                <option value="priorities">Priorities</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Auth Type</label>
+                            <select x-model="editService.auth_type"
+                                    class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                                <option value="none">None</option>
+                                <option value="basic">Basic Auth</option>
+                                <option value="forward-auth">Forward Auth</option>
+                                <option value="jellyfin">Jellyfin</option>
+                                <option value="ombi">Ombi</option>
+                                <option value="overseerr">Overseerr</option>
+                                <option value="nextcloud">Nextcloud</option>
+                                <option value="mattermost">Mattermost</option>
+                                <option value="open">Open (no auth)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-1">GitHub Repo (for CI status)</label>
+                        <input type="text" x-model="editService.github_repo" placeholder="e.g. nelsonblaha/homepage"
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" x-model="editService.is_default" id="edit-is-default"
+                               class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                        <label for="edit-is-default" class="text-gray-300">Default for new friends</label>
+                    </div>
+                    <div class="flex gap-3 pt-4">
+                        <button type="submit"
+                                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
+                            Save
+                        </button>
+                        <button type="button" @click="cancelEditService()"
+                                class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-2 px-4 rounded transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -692,6 +778,7 @@
                 editingDescription: '',
                 editingNameId: null,
                 editingName: '',
+                editService: null,  // Full service edit modal
                 expandedFriends: {},
                 toast: { show: false, message: '' },
 
@@ -1512,10 +1599,45 @@
                     return '?';
                 },
 
-                // Start editing a service (placeholder - could open modal)
+                // Start editing a service - opens modal with all fields
                 startEditService(service) {
-                    // For now, just use the existing inline edit for name
-                    this.startEditName(service);
+                    this.editService = { ...service };
+                },
+
+                cancelEditService() {
+                    this.editService = null;
+                },
+
+                async saveEditService() {
+                    if (!this.editService) return;
+                    try {
+                        const resp = await fetch(`/api/services/${this.editService.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: this.editService.name,
+                                url: this.editService.url,
+                                icon: this.editService.icon || '',
+                                description: this.editService.description || '',
+                                display_order: this.editService.display_order || 0,
+                                subdomain: this.editService.subdomain || '',
+                                stack: this.editService.stack || '',
+                                is_default: this.editService.is_default || false,
+                                auth_type: this.editService.auth_type || 'none',
+                                github_repo: this.editService.github_repo || ''
+                            })
+                        });
+                        if (resp.ok) {
+                            this.editService = null;
+                            await this.loadAdminData();
+                            await this.loadCIStatus();
+                        } else {
+                            const err = await resp.json();
+                            alert(`Error: ${err.detail}`);
+                        }
+                    } catch (e) {
+                        alert('Failed to save service');
+                    }
                 }
             }
         }
