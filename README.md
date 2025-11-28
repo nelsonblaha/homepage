@@ -20,8 +20,8 @@ A personal homepage for managing and sharing access to self-hosted services with
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/blaha-homepage.git
-cd blaha-homepage
+git clone https://github.com/nelsonblaha/homepage.git
+cd homepage
 
 # 2. Create configuration
 cp .env.example .env
@@ -98,13 +98,19 @@ When enabled, the app automatically creates and manages user accounts in integra
 - Requires email notifications to be enabled in Overseerr settings
 - Get API key from Overseerr: Settings > General
 
+### Mattermost
+- Creates local Mattermost users and adds them to your team
+- Auto-login via session cookie (MMAUTHTOKEN)
+- Get admin token from Mattermost: System Console > Integrations > Bot Accounts
+- Find your team ID in the URL when viewing a team
+
 ### How It Works
 
-1. Add a service named "Plex", "Ombi", "Jellyfin", "Nextcloud", or "Overseerr" (case-insensitive)
+1. Add a service named "Plex", "Ombi", "Jellyfin", "Nextcloud", "Overseerr", or "Mattermost" (case-insensitive)
 2. When you grant that service to a friend, an account is automatically created
 3. When you revoke access, the account is automatically deleted
 4. Deleting a friend removes all their accounts
-5. For auto-login services (Ombi, Jellyfin, Overseerr), clicking the service link auto-authenticates the user
+5. For auto-login services (Ombi, Jellyfin, Overseerr, Mattermost), clicking the service link auto-authenticates the user
 
 ## Nginx Reverse Proxy Setup
 
@@ -205,6 +211,7 @@ blaha-homepage/
 - `GET /api/jellyfin/status` - Check Jellyfin connection
 - `GET /api/nextcloud/status` - Check Nextcloud connection
 - `GET /api/overseerr/status` - Check Overseerr connection
+- `GET /api/mattermost/status` - Check Mattermost connection
 
 ### Authentication
 - `GET /auth/{subdomain}` - Unified auth redirect for friends (handles auto-login)
