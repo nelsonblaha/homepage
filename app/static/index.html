@@ -312,13 +312,13 @@
 
                 <!-- TABS -->
                 <div class="flex space-x-4 mb-6 border-b border-gray-700">
-                    <button @click="adminTab = 'friends'" data-testid="tab-friends"
+                    <button @click="setAdminTab('friends')" data-testid="tab-friends"
                             :class="adminTab === 'friends' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
                             class="px-4 py-2 -mb-px">Friends</button>
-                    <button @click="adminTab = 'services'" data-testid="tab-services"
+                    <button @click="setAdminTab('services')" data-testid="tab-services"
                             :class="adminTab === 'services' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
                             class="px-4 py-2 -mb-px">Services</button>
-                    <button @click="adminTab = 'requests'" data-testid="tab-requests"
+                    <button @click="setAdminTab('requests')" data-testid="tab-requests"
                             :class="adminTab === 'requests' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
                             class="px-4 py-2 -mb-px relative">
                         Requests
@@ -326,7 +326,7 @@
                               class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
                               x-text="accessRequests.length"></span>
                     </button>
-                    <button @click="adminTab = 'activity'; loadActivity()" data-testid="tab-activity"
+                    <button @click="setAdminTab('activity')" data-testid="tab-activity"
                             :class="adminTab === 'activity' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
                             class="px-4 py-2 -mb-px">Activity</button>
                 </div>
@@ -844,12 +844,20 @@
                     const path = window.location.pathname;
                     const params = new URLSearchParams(window.location.search);
 
-                    if (path === '/admin') {
+                    if (path === '/admin' || path.startsWith('/admin/')) {
                         const resp = await fetch('/api/admin/verify');
                         const data = await resp.json();
                         if (data.authenticated) {
                             this.view = 'admin';
                             await this.loadAdminData();
+                            // Set tab from URL path (e.g., /admin/services -> services)
+                            const tabFromUrl = path.split('/admin/')[1];
+                            if (tabFromUrl && ['services', 'requests', 'activity'].includes(tabFromUrl)) {
+                                this.adminTab = tabFromUrl;
+                                if (tabFromUrl === 'activity') {
+                                    this.loadActivity();
+                                }
+                            }
                         } else {
                             this.view = 'admin-login';
                         }
@@ -875,6 +883,38 @@
                     // Start Jitsi participant polling (every 5 seconds for live updates)
                     this.fetchJitsiParticipants();
                     setInterval(() => this.fetchJitsiParticipants(), 5000);
+
+                    // Handle browser back/forward for admin tabs
+                    window.addEventListener('popstate', (event) => {
+                        if (event.state?.tab) {
+                            this.adminTab = event.state.tab;
+                            if (event.state.tab === 'activity') {
+                                this.loadActivity();
+                            }
+                        } else {
+                            // Parse tab from URL if no state
+                            const currentPath = window.location.pathname;
+                            if (currentPath.startsWith('/admin/')) {
+                                const tabFromUrl = currentPath.split('/admin/')[1];
+                                if (['services', 'requests', 'activity'].includes(tabFromUrl)) {
+                                    this.adminTab = tabFromUrl;
+                                }
+                            } else if (currentPath === '/admin') {
+                                this.adminTab = 'friends';
+                            }
+                        }
+                    });
+                },
+
+                setAdminTab(tab) {
+                    this.adminTab = tab;
+                    // Update URL without reload
+                    const newPath = tab === 'friends' ? '/admin' : `/admin/${tab}`;
+                    history.pushState({tab}, '', newPath);
+                    // Load activity data if switching to activity tab
+                    if (tab === 'activity') {
+                        this.loadActivity();
+                    }
                 },
 
                 async fetchJitsiParticipants() {
