@@ -27,7 +27,8 @@ jobs:
           ADMIN_PASSWORD: testpassword
           SESSION_SECRET: testsecret1234567890abcdef
           DB_PATH: /tmp/test-unit.db
-          COOKIE_DOMAIN: localhost
+          BASE_DOMAIN: localhost
+          COOKIE_DOMAIN: ""
         run: |
           cd app
           python -m uvicorn main:app --host 0.0.0.0 --port 5000 &
@@ -91,7 +92,8 @@ jobs:
           ADMIN_PASSWORD: testpassword
           SESSION_SECRET: testsecret1234567890abcdef
           DB_PATH: /tmp/test-integration.db
-          COOKIE_DOMAIN: localhost
+          BASE_DOMAIN: localhost
+          COOKIE_DOMAIN: ""
           OMBI_URL: http://localhost:3580
           OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
         run: |
@@ -132,8 +134,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Deploy to production
+        env:
+          # Set DEPLOY_PATH in your runner environment or GitHub secrets
+          # Example: DEPLOY_PATH=/opt/blaha-homepage
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || github.workspace }}
         run: |
-          cd /home/ben/docker/blaha-homepage
-          git pull origin main
+          cd "$DEPLOY_PATH"
+          git pull origin main || true
           docker compose down
           docker compose up -d --build
