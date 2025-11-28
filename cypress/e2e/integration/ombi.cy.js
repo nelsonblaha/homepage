@@ -23,32 +23,44 @@ describe('Ombi E2E Integration', () => {
       retryOnStatusCodeFailure: true
     })
 
-    // Ensure Ombi service exists in test database
+    // Ensure Ombi service exists with correct config in test database
     cy.adminLogin()
     cy.request('/api/services').then((response) => {
       const ombiService = response.body.find(s =>
         s.name.toLowerCase().includes('ombi')
       )
 
+      const serviceConfig = {
+        name: 'Ombi',
+        url: OMBI_URL,
+        icon: '🎬',
+        description: 'Request movies & TV shows',
+        subdomain: 'ombi',
+        auth_type: 'ombi',  // Required for Ombi auth handler
+        is_default: false
+      }
+
       if (!ombiService) {
         // Create Ombi service for testing
         cy.request({
           method: 'POST',
           url: '/api/services',
-          body: {
-            name: 'Ombi',
-            url: OMBI_URL,
-            icon: '🎬',
-            description: 'Request movies & TV shows',
-            subdomain: 'ombi',
-            is_default: false
-          }
+          body: serviceConfig
         }).then((createResponse) => {
           expect(createResponse.status).to.eq(200)
           cy.log('Created Ombi service for testing')
         })
       } else {
-        cy.log(`Ombi service already exists: ${ombiService.name}`)
+        // Update existing service to ensure correct URL and auth_type
+        cy.log(`Updating Ombi service: ${ombiService.name} -> ${OMBI_URL}`)
+        cy.request({
+          method: 'PUT',
+          url: `/api/services/${ombiService.id}`,
+          body: { ...serviceConfig, id: ombiService.id }
+        }).then((updateResponse) => {
+          expect(updateResponse.status).to.eq(200)
+          cy.log('Updated Ombi service with CI config')
+        })
       }
     })
   })
