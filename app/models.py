@@ -12,6 +12,7 @@ class ServiceBase(BaseModel):
     stack: str = ""  # Docker stack: media, infra, jitsi, priorities, etc.
     is_default: bool = False  # Auto-grant to new friends
     auth_type: str = "none"  # none, basic, jellyfin, ombi
+    github_repo: str = ""  # GitHub repo for CI status (e.g., "nelsonblaha/homepage")
 
 class ServiceCreate(ServiceBase):
     pass

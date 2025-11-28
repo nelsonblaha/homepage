@@ -115,6 +115,12 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # Migration: Add github_repo column for CI status badges
+        try:
+            await db.execute("ALTER TABLE services ADD COLUMN github_repo TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
         # =====================================================================
         # MIGRATIONS FOR friends TABLE
         # =====================================================================

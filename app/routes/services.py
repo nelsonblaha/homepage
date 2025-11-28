@@ -40,10 +40,10 @@ async def list_services(_: bool = Depends(verify_admin)):
 async def create_service(service: ServiceCreate, _: bool = Depends(verify_admin)):
     async with await get_db() as db:
         cursor = await db.execute(
-            """INSERT INTO services (name, url, icon, description, display_order, subdomain, stack, is_default, auth_type)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO services (name, url, icon, description, display_order, subdomain, stack, is_default, auth_type, github_repo)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (service.name, service.url, service.icon, service.description, service.display_order,
-             service.subdomain, service.stack, 1 if service.is_default else 0, service.auth_type)
+             service.subdomain, service.stack, 1 if service.is_default else 0, service.auth_type, service.github_repo)
         )
         await db.commit()
         return Service(id=cursor.lastrowid, **service.model_dump())
@@ -54,9 +54,9 @@ async def update_service(service_id: int, service: ServiceCreate, _: bool = Depe
     async with await get_db() as db:
         await db.execute(
             """UPDATE services SET name=?, url=?, icon=?, description=?, display_order=?,
-               subdomain=?, stack=?, is_default=?, auth_type=? WHERE id=?""",
+               subdomain=?, stack=?, is_default=?, auth_type=?, github_repo=? WHERE id=?""",
             (service.name, service.url, service.icon, service.description, service.display_order,
-             service.subdomain, service.stack, 1 if service.is_default else 0, service.auth_type, service_id)
+             service.subdomain, service.stack, 1 if service.is_default else 0, service.auth_type, service.github_repo, service_id)
         )
         await db.commit()
         return Service(id=service_id, **service.model_dump())
@@ -202,3 +202,65 @@ async def get_integrations_summary(_: bool = Depends(verify_admin)):
             }
 
         return summary
+
+
+@router.get("/ci-status")
+async def get_ci_status(_: bool = Depends(verify_admin)):
+    """Get GitHub Actions CI status for all services with github_repo configured."""
+    import httpx
+
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        cursor = await db.execute(
+            "SELECT id, name, github_repo FROM services WHERE github_repo IS NOT NULL AND github_repo != ''"
+        )
+        services = await cursor.fetchall()
+
+    results = {}
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for service in services:
+            repo = service["github_repo"]
+            try:
+                # Fetch latest workflow run from GitHub API (public repos, no auth needed)
+                resp = await client.get(
+                    f"https://api.github.com/repos/{repo}/actions/runs",
+                    params={"per_page": 1, "branch": "main"},
+                    headers={"Accept": "application/vnd.github.v3+json"}
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("workflow_runs"):
+                        run = data["workflow_runs"][0]
+                        results[service["id"]] = {
+                            "status": run.get("status"),  # queued, in_progress, completed
+                            "conclusion": run.get("conclusion"),  # success, failure, cancelled, etc.
+                            "url": run.get("html_url"),
+                            "created_at": run.get("created_at"),
+                        }
+                    else:
+                        results[service["id"]] = {"status": "no_runs", "conclusion": None, "url": None}
+                else:
+                    # Try master branch if main fails
+                    resp = await client.get(
+                        f"https://api.github.com/repos/{repo}/actions/runs",
+                        params={"per_page": 1, "branch": "master"},
+                        headers={"Accept": "application/vnd.github.v3+json"}
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("workflow_runs"):
+                            run = data["workflow_runs"][0]
+                            results[service["id"]] = {
+                                "status": run.get("status"),
+                                "conclusion": run.get("conclusion"),
+                                "url": run.get("html_url"),
+                                "created_at": run.get("created_at"),
+                            }
+                        else:
+                            results[service["id"]] = {"status": "no_runs", "conclusion": None, "url": None}
+                    else:
+                        results[service["id"]] = {"status": "error", "conclusion": None, "url": None}
+            except Exception:
+                results[service["id"]] = {"status": "error", "conclusion": None, "url": None}
+
+    return results

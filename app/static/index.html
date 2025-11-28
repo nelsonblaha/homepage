@@ -563,6 +563,15 @@
                                                     <span x-show="integrationStatus[service.name.toLowerCase()]?.connected">● connected</span>
                                                     <span x-show="!integrationStatus[service.name.toLowerCase()]?.connected">○ not connected</span>
                                                 </span>
+                                                <!-- CI status badge -->
+                                                <a x-show="service.github_repo && ciStatus[service.id]"
+                                                   :href="ciStatus[service.id]?.url || `https://github.com/${service.github_repo}/actions`"
+                                                   target="_blank"
+                                                   :class="getCIBadgeClass(service.id)"
+                                                   class="text-xs px-2 py-0.5 rounded font-mono"
+                                                   :title="`CI: ${ciStatus[service.id]?.conclusion || ciStatus[service.id]?.status || 'unknown'}`">
+                                                    CI <span x-text="getCIBadgeText(service.id)"></span>
+                                                </a>
                                             </div>
                                             <div class="flex items-center gap-3 text-sm text-gray-400">
                                                 <span x-text="service.subdomain ? service.subdomain + '.' : ''"></span>
@@ -639,6 +648,8 @@
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
                             <input type="text" x-model="newService.subdomain" placeholder="Subdomain (e.g. ombi)"
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                            <input type="text" x-model="newService.github_repo" placeholder="GitHub repo (e.g. nelsonblaha/homepage)"
+                                   class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
                             <label class="flex items-center gap-2 text-gray-300">
                                 <input type="checkbox" x-model="newService.is_default"
                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
@@ -669,7 +680,8 @@
                 friends: [],
                 accessRequests: [],
                 newFriendName: '',
-                newService: { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false },
+                newService: { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false, github_repo: '' },
+                ciStatus: {},
                 plexStatus: { connected: false, username: '', error: '' },
                 ombiStatus: { connected: false, error: '' },
                 jellyfinStatus: { connected: false, serverName: '', error: '' },
@@ -947,8 +959,9 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.newService)
                     });
-                    this.newService = { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false };
+                    this.newService = { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false, github_repo: '' };
                     await this.loadAdminData();
+                    await this.loadCIStatus();
                 },
 
                 getStackClass(stack) {
@@ -1466,6 +1479,37 @@
                     } catch (e) {
                         console.error('Failed to load integration status:', e);
                     }
+                    // Also load CI status
+                    await this.loadCIStatus();
+                },
+
+                async loadCIStatus() {
+                    try {
+                        const resp = await fetch('/api/services/ci-status');
+                        if (resp.ok) {
+                            this.ciStatus = await resp.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load CI status:', e);
+                    }
+                },
+
+                getCIBadgeClass(serviceId) {
+                    const ci = this.ciStatus[serviceId];
+                    if (!ci) return 'bg-gray-700 text-gray-400';
+                    if (ci.status === 'in_progress') return 'bg-yellow-900 text-yellow-300';
+                    if (ci.conclusion === 'success') return 'bg-green-900 text-green-300';
+                    if (ci.conclusion === 'failure') return 'bg-red-900 text-red-300';
+                    return 'bg-gray-700 text-gray-400';
+                },
+
+                getCIBadgeText(serviceId) {
+                    const ci = this.ciStatus[serviceId];
+                    if (!ci) return '?';
+                    if (ci.status === 'in_progress') return '⏳';
+                    if (ci.conclusion === 'success') return '✓';
+                    if (ci.conclusion === 'failure') return '✗';
+                    return '?';
                 },
 
                 // Start editing a service (placeholder - could open modal)
