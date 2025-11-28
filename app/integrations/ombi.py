@@ -1,138 +1,239 @@
-"""Ombi integration - auto-login via localStorage token injection"""
-import os
-import secrets
+"""
+Ombi Integration - Auto-login via localStorage Token Injection
+
+This integration creates Ombi users with movie/TV request permissions
+and provides auto-login via JWT token injection into localStorage.
+
+Auth Flow:
+1. Friend clicks Ombi link
+2. Backend authenticates to Ombi API with stored credentials
+3. Receives JWT access token
+4. Redirects to ombi.{domain}/blaha-auth-setup
+5. Auth-setup page injects token into localStorage
+6. Redirects to Ombi (now logged in)
+"""
+
 import httpx
 from fastapi import APIRouter, Depends
+from fastapi.responses import HTMLResponse
 
+from integrations.base import (
+    TokenInjectionIntegration,
+    UserResult,
+    AuthResult,
+    StatusResult,
+    HttpIntegrationMixin,
+)
 from services.session import verify_admin
 
-OMBI_URL = os.environ.get("OMBI_URL", "")
-OMBI_API_KEY = os.environ.get("OMBI_API_KEY", "")
-BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
 
-router = APIRouter(prefix="/api/ombi", tags=["ombi"])
+class OmbiIntegration(TokenInjectionIntegration, HttpIntegrationMixin):
+    """Ombi integration using token injection for auto-login."""
 
+    SERVICE_NAME = "ombi"
+    ENV_PREFIX = "OMBI"
+    LOCAL_STORAGE_KEY = "id_token"
 
-async def create_ombi_user(username: str) -> dict | None:
-    """Create an Ombi user with password. Returns user info including password."""
-    if not OMBI_URL or not OMBI_API_KEY:
-        return None
-    try:
-        async with httpx.AsyncClient() as client:
-            password = secrets.token_urlsafe(16)
-            resp = await client.post(
-                f"{OMBI_URL}/api/v1/Identity",
-                headers={"ApiKey": OMBI_API_KEY, "Content-Type": "application/json"},
-                json={
-                    "userName": username,
-                    "password": password,
-                    "claims": [{"value": "RequestMovie", "enabled": True},
-                              {"value": "RequestTv", "enabled": True}]
-                },
-                timeout=10.0
-            )
-            if resp.status_code in (200, 201):
+    # Database columns
+    DB_USER_ID_COLUMN = "ombi_user_id"
+    DB_PASSWORD_COLUMN = "ombi_password"
+
+    @property
+    def is_configured(self) -> bool:
+        """Ombi requires both URL and API key."""
+        return bool(self.service_url and self.api_key)
+
+    def _get_headers(self) -> dict:
+        """Get headers for Ombi API requests."""
+        return {
+            "ApiKey": self.api_key,
+            "Content-Type": "application/json"
+        }
+
+    async def create_user(self, username: str) -> UserResult:
+        """
+        Create an Ombi user with movie/TV request permissions.
+
+        Ombi's API doesn't return the user ID on creation, so we need
+        to fetch the user list to get it.
+        """
+        if not self.is_configured:
+            return UserResult(success=False, error="Ombi not configured")
+
+        password = self.generate_password()
+
+        try:
+            async with httpx.AsyncClient() as client:
+                # Create user with request permissions
+                resp = await client.post(
+                    f"{self.service_url}/api/v1/Identity",
+                    headers=self._get_headers(),
+                    json={
+                        "userName": username,
+                        "password": password,
+                        "claims": [
+                            {"value": "RequestMovie", "enabled": True},
+                            {"value": "RequestTv", "enabled": True}
+                        ]
+                    },
+                    timeout=10.0
+                )
+
+                if resp.status_code not in (200, 201):
+                    return UserResult(
+                        success=False,
+                        error=f"Ombi create user failed: {resp.status_code} {resp.text}"
+                    )
+
                 data = resp.json()
-                # Ombi API doesn't return ID on creation, need to fetch it
                 user_id = data.get("id")
+
+                # Ombi API doesn't return ID on creation, fetch it
                 if not user_id:
-                    # Look up user by name to get ID
                     users_resp = await client.get(
-                        f"{OMBI_URL}/api/v1/Identity/Users",
-                        headers={"ApiKey": OMBI_API_KEY},
+                        f"{self.service_url}/api/v1/Identity/Users",
+                        headers=self._get_headers(),
                         timeout=10.0
                     )
                     if users_resp.status_code == 200:
-                        users = users_resp.json()
-                        for user in users:
+                        for user in users_resp.json():
                             if user.get("userName") == username:
                                 user_id = user.get("id")
                                 break
-                return {"id": user_id, "username": username, "password": password}
-            print(f"Ombi create user failed: {resp.status_code} {resp.text}")
-    except Exception as e:
-        print(f"Ombi error: {e}")
+
+                return UserResult(
+                    success=True,
+                    user_id=str(user_id) if user_id else None,
+                    username=username,
+                    password=password
+                )
+
+        except Exception as e:
+            return UserResult(success=False, error=f"Ombi error: {e}")
+
+    async def delete_user(self, user_id: str) -> bool:
+        """Delete an Ombi user by ID."""
+        if not self.is_configured:
+            return False
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.delete(
+                    f"{self.service_url}/api/v1/Identity/{user_id}",
+                    headers={"ApiKey": self.api_key},
+                    timeout=10.0
+                )
+                return resp.status_code in (200, 204)
+        except Exception as e:
+            print(f"Ombi delete error: {e}")
+            return False
+
+    async def authenticate(self, username: str, password: str) -> AuthResult:
+        """Authenticate to Ombi and get JWT token."""
+        if not self.service_url:
+            return AuthResult(success=False, error="Ombi not configured")
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    f"{self.service_url}/api/v1/Token",
+                    headers={"Content-Type": "application/json"},
+                    json={"username": username, "password": password},
+                    timeout=10.0
+                )
+
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return AuthResult(
+                        success=True,
+                        access_token=data.get("access_token")
+                    )
+
+                return AuthResult(success=False, error=f"Auth failed: {resp.status_code}")
+        except Exception as e:
+            return AuthResult(success=False, error=f"Ombi auth error: {e}")
+
+    async def check_status(self) -> StatusResult:
+        """Check Ombi connection status."""
+        if not self.is_configured:
+            return StatusResult(connected=False, error="Not configured")
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"{self.service_url}/api/v1/Status",
+                    headers={"ApiKey": self.api_key},
+                    timeout=5.0
+                )
+                if resp.status_code == 200:
+                    return StatusResult(connected=True, server_name="Ombi")
+        except Exception as e:
+            return StatusResult(connected=False, error=str(e))
+
+        return StatusResult(connected=False, error="Connection failed")
+
+
+# =============================================================================
+# SINGLETON INSTANCE (for registry)
+# =============================================================================
+
+ombi_integration = OmbiIntegration()
+
+
+# =============================================================================
+# BACKWARDS-COMPATIBLE FUNCTIONS
+# =============================================================================
+# These maintain compatibility with existing code in accounts.py
+# Will be removed once accounts.py uses the registry
+
+async def create_ombi_user(username: str) -> dict | None:
+    """Create an Ombi user with password. Returns user info including password."""
+    result = await ombi_integration.create_user(username)
+    if result.success:
+        return {
+            "id": result.user_id,
+            "username": result.username,
+            "password": result.password
+        }
     return None
 
 
 async def delete_ombi_user(user_id: str) -> bool:
     """Delete an Ombi user by ID."""
-    if not OMBI_URL or not OMBI_API_KEY:
-        return False
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.delete(
-                f"{OMBI_URL}/api/v1/Identity/{user_id}",
-                headers={"ApiKey": OMBI_API_KEY},
-                timeout=10.0
-            )
-            return resp.status_code in (200, 204)
-    except Exception as e:
-        print(f"Ombi delete error: {e}")
-    return False
+    return await ombi_integration.delete_user(user_id)
 
 
 async def authenticate_ombi(username: str, password: str) -> str | None:
     """Authenticate to Ombi and return JWT token."""
-    if not OMBI_URL:
-        return None
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{OMBI_URL}/api/v1/Token",
-                headers={"Content-Type": "application/json"},
-                json={"username": username, "password": password},
-                timeout=10.0
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                return data.get("access_token")
-    except Exception as e:
-        print(f"Ombi auth error: {e}")
-    return None
+    result = await ombi_integration.authenticate(username, password)
+    return result.access_token if result.success else None
+
+
+# =============================================================================
+# FASTAPI ROUTER
+# =============================================================================
+
+router = APIRouter(prefix="/api/ombi", tags=["ombi"])
 
 
 @router.get("/auth-setup")
 async def ombi_auth_setup(access_token: str):
-    """Serve the localStorage setup page for Ombi auto-login.
+    """
+    Serve the localStorage setup page for Ombi auto-login.
 
     This endpoint is accessed via ombi.{BASE_DOMAIN}/blaha-auth-setup so that
     localStorage is set on the correct domain.
     """
-    from fastapi.responses import HTMLResponse
-
-    redirect_url = f"https://ombi.{BASE_DOMAIN}/"
-    html = f"""<!DOCTYPE html>
-<html>
-<head><title>Signing into Ombi...</title></head>
-<body style="background:#101010;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
-<div style="text-align:center">
-<h2>Signing into Ombi...</h2>
-<script>
-localStorage.setItem('id_token', '{access_token}');
-window.location.href = '{redirect_url}';
-</script>
-<noscript>JavaScript is required. <a href="{redirect_url}">Go to Ombi</a></noscript>
-</div>
-</body>
-</html>"""
+    auth_result = AuthResult(success=True, access_token=access_token)
+    html = ombi_integration.build_auth_setup_html(auth_result)
     return HTMLResponse(content=html)
 
 
 @router.get("/status")
 async def ombi_status(_: bool = Depends(verify_admin)):
     """Check Ombi connection status."""
-    if not OMBI_URL or not OMBI_API_KEY:
-        return {"connected": False, "error": "Not configured"}
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{OMBI_URL}/api/v1/Status",
-                headers={"ApiKey": OMBI_API_KEY},
-                timeout=5.0
-            )
-            if resp.status_code == 200:
-                return {"connected": True}
-    except Exception as e:
-        return {"connected": False, "error": str(e)}
-    return {"connected": False, "error": "Connection failed"}
+    result = await ombi_integration.check_status()
+    response = {"connected": result.connected}
+    if result.error:
+        response["error"] = result.error
+    return response
