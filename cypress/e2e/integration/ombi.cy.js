@@ -182,18 +182,10 @@ describe('Ombi E2E Integration', () => {
       cy.visit(friendLink)
       cy.wait(1000) // Let cookie set
 
-      // Find and click Ombi service card
-      cy.get('[data-testid="services-grid"]')
-        .contains(/ombi|jellyseerr|request/i)
-        .closest('a')
-        .then(($link) => {
-          const href = $link.attr('href')
-          cy.log(`Service link: ${href}`)
-
-          // The link should go through auth redirect
-          // Open in same window to capture the flow
-          cy.visit(href)
-        })
+      // The service cards use window.open() which Cypress can't follow.
+      // Instead, directly visit the auth endpoint that the service card would use.
+      // For Ombi (auth_type: 'ombi'), the URL pattern is /auth/{subdomain}
+      cy.visit('/auth/ombi')
 
       // After redirect chain, should land on Ombi
       cy.url().should('include', 'ombi')
