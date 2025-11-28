@@ -1135,18 +1135,21 @@
                 },
 
                 getSortedServicesForFriend(friend) {
-                    // Sort services: 1) services friend has access to first, 2) then by stack, 3) then by name
-                    return [...this.services].sort((a, b) => {
-                        const aHasAccess = this.hasService(friend, a.id) ? 0 : 1;
-                        const bHasAccess = this.hasService(friend, b.id) ? 0 : 1;
-                        if (aHasAccess !== bHasAccess) return aHasAccess - bHasAccess;
-                        // Then sort by stack (empty stacks go last)
-                        const aStack = a.stack || 'zzz';
-                        const bStack = b.stack || 'zzz';
-                        if (aStack !== bStack) return aStack.localeCompare(bStack);
-                        // Finally by name
-                        return a.name.localeCompare(b.name);
-                    });
+                    // Filter out Homepage (self-referential) and sort:
+                    // 1) services friend has access to first, 2) then by stack, 3) then by name
+                    return [...this.services]
+                        .filter(s => s.name.toLowerCase() !== 'homepage')
+                        .sort((a, b) => {
+                            const aHasAccess = this.hasService(friend, a.id) ? 0 : 1;
+                            const bHasAccess = this.hasService(friend, b.id) ? 0 : 1;
+                            if (aHasAccess !== bHasAccess) return aHasAccess - bHasAccess;
+                            // Then sort by stack (empty stacks go last)
+                            const aStack = a.stack || 'zzz';
+                            const bStack = b.stack || 'zzz';
+                            if (aStack !== bStack) return aStack.localeCompare(bStack);
+                            // Finally by name
+                            return a.name.localeCompare(b.name);
+                        });
                 },
 
                 async toggleServiceVisibility(service) {
