@@ -255,8 +255,8 @@ jobs:
           PAYLOAD='{"ref":"${{ github.ref }}","sha":"${{ github.sha }}"}'
           SIGNATURE="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)"
 
-          # Call webhook on localhost
-          curl -sf -X POST http://127.0.0.1:9000/deploy \
+          # Call webhook on host (runners are containerized)
+          curl -sf -X POST http://host.docker.internal:9000/deploy \
             -H "Content-Type: application/json" \
             -H "X-Hub-Signature-256: $SIGNATURE" \
             -d "$PAYLOAD"
