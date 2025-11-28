@@ -15,8 +15,11 @@ describe('Service Management', () => {
     })
   })
 
-  it('should load integration status', () => {
-    cy.get('[data-testid="tab-friends"]').click()
-    cy.get('[data-testid="integrations"]').should('exist')
+  it('should load integration status via API', () => {
+    // Integration status is now loaded via API, not a UI element
+    cy.request('/api/services/integrations-summary').then((response) => {
+      expect(response.status).to.eq(200)
+      expect(response.body).to.be.an('object')
+    })
   })
 })
