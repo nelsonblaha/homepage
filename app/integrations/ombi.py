@@ -181,10 +181,13 @@ ombi_integration = OmbiIntegration()
 
 
 # =============================================================================
-# BACKWARDS-COMPATIBLE FUNCTIONS
+# BACKWARDS-COMPATIBLE EXPORTS
 # =============================================================================
-# These maintain compatibility with existing code in accounts.py
-# Will be removed once accounts.py uses the registry
+# These maintain compatibility with existing code in auth.py and accounts.py
+
+# Export OMBI_URL for auth.py compatibility
+OMBI_URL = ombi_integration.service_url
+
 
 async def create_ombi_user(username: str) -> dict | None:
     """Create an Ombi user with password. Returns user info including password."""

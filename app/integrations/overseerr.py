@@ -190,8 +190,12 @@ overseerr_integration = OverseerrIntegration()
 
 
 # =============================================================================
-# BACKWARDS-COMPATIBLE FUNCTIONS
+# BACKWARDS-COMPATIBLE EXPORTS
 # =============================================================================
+
+# Export OVERSEERR_URL for auth.py compatibility
+OVERSEERR_URL = overseerr_integration.service_url
+
 
 async def create_overseerr_user(username: str) -> dict | None:
     """Create an Overseerr local user with password. Returns user info including password."""

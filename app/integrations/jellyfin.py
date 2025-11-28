@@ -227,8 +227,12 @@ jellyfin_integration = JellyfinIntegration()
 
 
 # =============================================================================
-# BACKWARDS-COMPATIBLE FUNCTIONS
+# BACKWARDS-COMPATIBLE EXPORTS
 # =============================================================================
+
+# Export JELLYFIN_URL for auth.py compatibility
+JELLYFIN_URL = jellyfin_integration.service_url
+
 
 async def create_jellyfin_user(username: str) -> dict | None:
     """Create a Jellyfin user with a password. Returns user info or None on failure."""
