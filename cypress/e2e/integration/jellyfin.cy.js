@@ -20,8 +20,7 @@ describe('Jellyfin E2E Integration', () => {
     cy.request({
       url: `${JELLYFIN_URL}/health`,
       timeout: 90000,
-      retryOnStatusCodeFailure: true,
-      failOnStatusCode: false
+      retryOnStatusCodeFailure: true
     })
 
     // Ensure Jellyfin service exists with correct config in test database

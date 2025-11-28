@@ -20,8 +20,7 @@ describe('Mattermost E2E Integration', () => {
     cy.request({
       url: `${MATTERMOST_URL}/api/v4/system/ping`,
       timeout: 90000,
-      retryOnStatusCodeFailure: true,
-      failOnStatusCode: false
+      retryOnStatusCodeFailure: true
     })
 
     // Ensure Mattermost service exists with correct config

@@ -20,8 +20,7 @@ describe('Nextcloud E2E Integration', () => {
     cy.request({
       url: `${NEXTCLOUD_URL}/status.php`,
       timeout: 120000,
-      retryOnStatusCodeFailure: true,
-      failOnStatusCode: false
+      retryOnStatusCodeFailure: true
     })
 
     // Ensure Nextcloud service exists with correct config

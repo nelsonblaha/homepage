@@ -20,8 +20,7 @@ describe('Overseerr E2E Integration', () => {
     cy.request({
       url: `${OVERSEERR_URL}/api/v1/status`,
       timeout: 90000,
-      retryOnStatusCodeFailure: true,
-      failOnStatusCode: false
+      retryOnStatusCodeFailure: true
     })
 
     // Ensure Overseerr service exists with correct config
