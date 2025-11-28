@@ -107,12 +107,18 @@ jobs:
     runs-on: self-hosted
     # No needs - runs in parallel with pytest and cypress-unit
     timeout-minutes: 15
-    env:
-      # Dynamic port to avoid conflicts with parallel runs (3580-4579)
-      OMBI_PORT: ${{ (github.run_id % 1000) + 3580 }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set dynamic port
+        id: ports
+        run: |
+          # Unique port based on run_id to avoid conflicts (3580-4579)
+          OMBI_PORT=$(((${{ github.run_id }} % 1000) + 3580))
+          echo "OMBI_PORT=$OMBI_PORT" >> $GITHUB_ENV
+          echo "ombi_port=$OMBI_PORT" >> $GITHUB_OUTPUT
+          echo "Using OMBI_PORT=$OMBI_PORT"
 
       - name: Install Cypress dependencies
         run: |
