@@ -1405,6 +1405,11 @@
                     const now = new Date();
                     const seconds = Math.floor((now - date) / 1000);
 
+                    // Handle edge cases
+                    if (seconds < 0) return 'just now';
+                    if (seconds < 10) return 'just now';
+                    if (seconds < 60) return seconds + ' seconds ago';
+
                     const intervals = [
                         { label: 'year', plural: 'years', seconds: 31536000 },
                         { label: 'month', plural: 'months', seconds: 2592000 },
