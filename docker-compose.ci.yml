@@ -9,7 +9,7 @@ services:
       - PGID=1000
       - TZ=America/Chicago
     ports:
-      - "3580:3579"  # CI port (production uses 3579)
+      - "${OMBI_PORT:-3580}:3579"  # Dynamic port via CI_RUN_ID for parallel runs
     volumes:
       - ombi-ci-config:/config
     healthcheck:
