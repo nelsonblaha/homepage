@@ -683,6 +683,8 @@
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
                             <input type="text" x-model="newService.github_repo" placeholder="GitHub repo (e.g. nelsonblaha/homepage)"
                                    class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
+                            <input type="text" x-model="newService.quick_join_params" placeholder='Quick-join params JSON (e.g. {"session":"blaha.io"})'
+                                   class="bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500">
                             <label class="flex items-center gap-2 text-gray-300">
                                 <input type="checkbox" x-model="newService.is_default"
                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
@@ -799,7 +801,7 @@
                 friends: [],
                 accessRequests: [],
                 newFriendName: '',
-                newService: { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false, github_repo: '' },
+                newService: { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false, github_repo: '', quick_join_params: '' },
                 ciStatus: {},
                 plexStatus: { connected: false, username: '', error: '' },
                 ombiStatus: { connected: false, error: '' },
@@ -1133,7 +1135,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(this.newService)
                     });
-                    this.newService = { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false, github_repo: '' };
+                    this.newService = { name: '', url: '', icon: '', description: '', subdomain: '', is_default: false, github_repo: '', quick_join_params: '' };
                     await this.loadAdminData();
                     await this.loadCIStatus();
                 },
@@ -1207,14 +1209,35 @@
                     if (service.subdomain && (authType === 'jellyfin' || authType === 'ombi' || authType === 'basic' || authType === 'overseerr')) {
                         return `/auth/${service.subdomain}`;
                     }
+
+                    // Build URL with quick-join params if configured
+                    let url = new URL(service.url);
+
+                    // Apply quick_join_params if present (JSON object with param name -> value)
+                    if (service.quick_join_params && this.friendName) {
+                        try {
+                            const params = JSON.parse(service.quick_join_params);
+                            Object.entries(params).forEach(([key, value]) => {
+                                // Support template variables
+                                let paramValue = value;
+                                if (value === '{friendName}') {
+                                    paramValue = this.friendName;
+                                } else if (value === '{friendToken}') {
+                                    paramValue = this.friendToken;
+                                }
+                                url.searchParams.set(key, paramValue);
+                            });
+                        } catch (e) {
+                            console.error('Invalid quick_join_params JSON:', e);
+                        }
+                    }
+
                     // For Jitsi/Video Chat, append friend's name as display name
                     if (service.name.toLowerCase().includes('video') && this.friendName) {
-                        const url = new URL(service.url);
                         url.hash = `userInfo.displayName="${encodeURIComponent(this.friendName)}"`;
-                        return url.toString();
                     }
-                    // For forward auth (none) and manual login services, use URL directly
-                    return service.url;
+
+                    return url.toString();
                 },
 
                 isAutoAuth(service) {

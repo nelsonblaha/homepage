@@ -121,6 +121,12 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # Migration: Add quick_join_params column for quick-join URL generation
+        try:
+            await db.execute("ALTER TABLE services ADD COLUMN quick_join_params TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
         # =====================================================================
         # MIGRATIONS FOR friends TABLE
         # =====================================================================

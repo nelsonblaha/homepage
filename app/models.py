@@ -13,6 +13,7 @@ class ServiceBase(BaseModel):
     is_default: bool = False  # Auto-grant to new friends
     auth_type: str = "none"  # none, basic, jellyfin, ombi
     github_repo: str = ""  # GitHub repo for CI status (e.g., "nelsonblaha/homepage")
+    quick_join_params: str = ""  # JSON params for quick-join URLs, e.g. {"session": "blaha.io"}
 
 class ServiceCreate(ServiceBase):
     pass
