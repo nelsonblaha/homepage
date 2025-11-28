@@ -247,16 +247,18 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
-      - name: Trigger deploy webhook
-        env:
-          WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
-        run: |
-          # Calculate HMAC signature
-          PAYLOAD='{"ref":"${{ github.ref }}","sha":"${{ github.sha }}"}'
-          SIGNATURE="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)"
+      - uses: actions/checkout@v4
 
-          # Call webhook on host (runners are containerized)
-          curl -sf -X POST http://host.docker.internal:9002/deploy \
-            -H "Content-Type: application/json" \
-            -H "X-Hub-Signature-256: $SIGNATURE" \
-            -d "$PAYLOAD"
+      - name: Deploy to production
+        run: |
+          # Deploy using the mounted production directory
+          cd /home/ben/docker/blaha-homepage
+
+          # Pull latest (already checked out by this workflow, but sync mounted dir)
+          git pull origin main
+
+          # Rebuild and restart the container
+          docker compose down
+          docker compose up -d --build
+
+          echo "Deploy complete!"
