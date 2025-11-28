@@ -1,4 +1,4 @@
-"""Ombi integration for blaha.io"""
+"""Ombi integration - auto-login via localStorage token injection"""
 import os
 import secrets
 import httpx
@@ -8,6 +8,7 @@ from services.session import verify_admin
 
 OMBI_URL = os.environ.get("OMBI_URL", "")
 OMBI_API_KEY = os.environ.get("OMBI_API_KEY", "")
+BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
 
 router = APIRouter(prefix="/api/ombi", tags=["ombi"])
 
@@ -95,11 +96,12 @@ async def authenticate_ombi(username: str, password: str) -> str | None:
 async def ombi_auth_setup(access_token: str):
     """Serve the localStorage setup page for Ombi auto-login.
 
-    This endpoint is accessed via ombi.blaha.io/blaha-auth-setup so that
-    localStorage is set on the correct domain (ombi.blaha.io).
+    This endpoint is accessed via ombi.{BASE_DOMAIN}/blaha-auth-setup so that
+    localStorage is set on the correct domain.
     """
     from fastapi.responses import HTMLResponse
 
+    redirect_url = f"https://ombi.{BASE_DOMAIN}/"
     html = f"""<!DOCTYPE html>
 <html>
 <head><title>Signing into Ombi...</title></head>
@@ -108,9 +110,9 @@ async def ombi_auth_setup(access_token: str):
 <h2>Signing into Ombi...</h2>
 <script>
 localStorage.setItem('id_token', '{access_token}');
-window.location.href = 'https://ombi.blaha.io/';
+window.location.href = '{redirect_url}';
 </script>
-<noscript>JavaScript is required. <a href="https://ombi.blaha.io">Go to Ombi</a></noscript>
+<noscript>JavaScript is required. <a href="{redirect_url}">Go to Ombi</a></noscript>
 </div>
 </body>
 </html>"""

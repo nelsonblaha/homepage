@@ -15,9 +15,11 @@ from integrations.jellyfin import authenticate_jellyfin, JELLYFIN_URL
 from integrations.overseerr import OVERSEERR_URL
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changeme")
-BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "ben")
+BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "")
 BASIC_AUTH_PASS = os.environ.get("BASIC_AUTH_PASS", "")
-COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", ".blaha.io")  # Use None for localhost
+COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", "")  # e.g., ".example.com" - leave empty for localhost
+BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")  # e.g., "example.com"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@localhost")
 
 router = APIRouter(tags=["auth"])
 
@@ -87,7 +89,7 @@ async def forward_auth_verify(
     session = await validate_session(admin_token)
     if session and session["type"] == "admin":
         response_headers["X-Remote-User"] = "admin"
-        response_headers["X-Remote-Email"] = "admin@blaha.io"
+        response_headers["X-Remote-Email"] = ADMIN_EMAIL
         return Response(status_code=200, headers=response_headers)
 
     # Check friend session
@@ -112,7 +114,7 @@ async def forward_auth_verify(
 
                 if has_access:
                     response_headers["X-Remote-User"] = friend["name"]
-                    response_headers["X-Remote-Email"] = f"{friend['name'].lower().replace(' ', '')}@friends.blaha.io"
+                    response_headers["X-Remote-Email"] = f"{friend['name'].lower().replace(' ', '')}@friends.{BASE_DOMAIN}"
                     return Response(status_code=200, headers=response_headers)
                 else:
                     return Response(status_code=403)
@@ -156,20 +158,20 @@ async def create_friend_session(response: Response, request: Request, token: str
 
 async def _auth_basic(subdomain: str) -> Response:
     """Generate preauth URL redirect for basic auth services."""
-    if not BASIC_AUTH_PASS:
+    if not BASIC_AUTH_PASS or not BASIC_AUTH_USER:
         raise HTTPException(status_code=500, detail="Basic auth not configured")
     from urllib.parse import quote
     user = quote(BASIC_AUTH_USER, safe='')
     passwd = quote(BASIC_AUTH_PASS, safe='')
-    preauth_url = f"https://{user}:{passwd}@{subdomain}.blaha.io/"
+    preauth_url = f"https://{user}:{passwd}@{subdomain}.{BASE_DOMAIN}/"
     return RedirectResponse(url=preauth_url, status_code=302)
 
 
 async def _auth_ombi(friend: dict) -> Response:
-    """Authenticate to Ombi and redirect to setup page on ombi.blaha.io.
+    """Authenticate to Ombi and redirect to setup page on ombi subdomain.
 
-    The localStorage must be set on ombi.blaha.io domain, so we redirect
-    to ombi.blaha.io/blaha-auth-setup which proxies to our auth-setup endpoint.
+    The localStorage must be set on the ombi subdomain, so we redirect
+    to ombi.{BASE_DOMAIN}/blaha-auth-setup which proxies to our auth-setup endpoint.
     """
     if not OMBI_URL:
         raise HTTPException(status_code=400, detail="Ombi not configured")
@@ -183,18 +185,18 @@ async def _auth_ombi(friend: dict) -> Response:
 
     from urllib.parse import urlencode
     params = urlencode({"access_token": access_token})
-    # Redirect to ombi.blaha.io so localStorage is set on correct domain
+    # Redirect to ombi subdomain so localStorage is set on correct domain
     return RedirectResponse(
-        url=f"https://ombi.blaha.io/blaha-auth-setup?{params}",
+        url=f"https://ombi.{BASE_DOMAIN}/blaha-auth-setup?{params}",
         status_code=302
     )
 
 
 async def _auth_jellyfin(friend: dict) -> Response:
-    """Authenticate to Jellyfin and redirect to setup page on jellyfin.blaha.io.
+    """Authenticate to Jellyfin and redirect to setup page on jellyfin subdomain.
 
-    The localStorage must be set on jellyfin.blaha.io domain, so we redirect
-    to jellyfin.blaha.io/blaha-auth-setup which proxies to our auth-setup endpoint.
+    The localStorage must be set on the jellyfin subdomain, so we redirect
+    to jellyfin.{BASE_DOMAIN}/blaha-auth-setup which proxies to our auth-setup endpoint.
     """
     if not JELLYFIN_URL:
         raise HTTPException(status_code=400, detail="Jellyfin not configured")
@@ -212,17 +214,17 @@ async def _auth_jellyfin(friend: dict) -> Response:
         "user_id": auth_data["user_id"],
         "server_id": auth_data["server_id"]
     })
-    # Redirect to jellyfin.blaha.io so localStorage is set on correct domain
+    # Redirect to jellyfin subdomain so localStorage is set on correct domain
     return RedirectResponse(
-        url=f"https://jellyfin.blaha.io/blaha-auth-setup?{params}",
+        url=f"https://jellyfin.{BASE_DOMAIN}/blaha-auth-setup?{params}",
         status_code=302
     )
 
 
 async def _auth_overseerr(friend: dict) -> Response:
-    """Authenticate to Overseerr and redirect to setup page on overseerr.blaha.io.
+    """Authenticate to Overseerr and redirect to setup page on overseerr subdomain.
 
-    Overseerr uses session cookies, so we redirect to overseerr.blaha.io/blaha-auth-setup
+    Overseerr uses session cookies, so we redirect to overseerr.{BASE_DOMAIN}/blaha-auth-setup
     which proxies to our auth-setup endpoint that handles login and sets cookies.
     """
     if not OVERSEERR_URL:
@@ -233,14 +235,14 @@ async def _auth_overseerr(friend: dict) -> Response:
 
     from urllib.parse import urlencode
     # Email format matches what we create in overseerr.py
-    email = f"{friend['name'].lower().replace(' ', '')}@blaha.io"
+    email = f"{friend['name'].lower().replace(' ', '')}@{BASE_DOMAIN}"
     params = urlencode({
         "email": email,
         "password": friend["overseerr_password"]
     })
-    # Redirect to overseerr.blaha.io so cookies are set on correct domain
+    # Redirect to overseerr subdomain so cookies are set on correct domain
     return RedirectResponse(
-        url=f"https://overseerr.blaha.io/blaha-auth-setup?{params}",
+        url=f"https://overseerr.{BASE_DOMAIN}/blaha-auth-setup?{params}",
         status_code=302
     )
 

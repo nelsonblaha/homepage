@@ -1,4 +1,4 @@
-"""Mattermost integration for blaha.io - user management and auto-auth"""
+"""Mattermost integration - auto-login via session cookie proxy"""
 import os
 import secrets
 import httpx
@@ -7,7 +7,9 @@ from fastapi.responses import RedirectResponse, Response
 
 MATTERMOST_URL = os.environ.get("MATTERMOST_URL", "")
 MATTERMOST_TOKEN = os.environ.get("MATTERMOST_TOKEN", "")
-MATTERMOST_TEAM_ID = os.environ.get("MATTERMOST_TEAM_ID", "c5dtbw7nifbnbxbo6wrdowck4h")
+MATTERMOST_TEAM_ID = os.environ.get("MATTERMOST_TEAM_ID", "")
+BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
+COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", "")  # e.g., ".example.com"
 
 router = APIRouter(prefix="/api/mattermost", tags=["mattermost"])
 
@@ -19,7 +21,7 @@ async def create_mattermost_user(username: str) -> dict | None:
     try:
         async with httpx.AsyncClient() as client:
             password = secrets.token_urlsafe(16)
-            email = f"{username.lower().replace(' ', '')}@blaha.io"
+            email = f"{username.lower().replace(' ', '')}@{BASE_DOMAIN}"
             # Mattermost username must be lowercase, alphanumeric + underscores
             mm_username = username.lower().replace(' ', '_')
 
@@ -108,15 +110,18 @@ async def mattermost_auth_setup(email: str, password: str):
             if resp.status_code == 200:
                 token = resp.headers.get("Token")
                 # Create redirect response and set the MMAUTHTOKEN cookie
-                redirect = RedirectResponse(url="https://chat.blaha.io", status_code=302)
-                redirect.set_cookie(
-                    key="MMAUTHTOKEN",
-                    value=token,
-                    domain=".blaha.io",
-                    httponly=True,
-                    secure=True,
-                    samesite="lax"
-                )
+                redirect = RedirectResponse(url=f"https://chat.{BASE_DOMAIN}", status_code=302)
+                cookie_kwargs = {
+                    "key": "MMAUTHTOKEN",
+                    "value": token,
+                    "httponly": True,
+                    "samesite": "lax"
+                }
+                # Only set domain and secure for non-localhost
+                if COOKIE_DOMAIN:
+                    cookie_kwargs["domain"] = COOKIE_DOMAIN
+                    cookie_kwargs["secure"] = True
+                redirect.set_cookie(**cookie_kwargs)
                 return redirect
             else:
                 return Response(content=f"Auth failed: {resp.status_code}", status_code=401)

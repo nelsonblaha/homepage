@@ -1,4 +1,4 @@
-"""Overseerr integration for blaha.io"""
+"""Overseerr integration - auto-login via session cookie proxy"""
 import os
 import secrets
 import httpx
@@ -8,6 +8,8 @@ from services.session import verify_admin
 
 OVERSEERR_URL = os.environ.get("OVERSEERR_URL", "")
 OVERSEERR_API_KEY = os.environ.get("OVERSEERR_API_KEY", "")
+BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
+COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", "")  # e.g., ".example.com"
 
 router = APIRouter(prefix="/api/overseerr", tags=["overseerr"])
 
@@ -19,7 +21,7 @@ async def create_overseerr_user(username: str) -> dict | None:
     try:
         async with httpx.AsyncClient() as client:
             password = secrets.token_urlsafe(16)
-            email = f"{username.lower().replace(' ', '')}@blaha.io"
+            email = f"{username.lower().replace(' ', '')}@{BASE_DOMAIN}"
 
             # Create the user
             # Permissions are bit flags: 2=REQUEST, 32=AUTO_APPROVE
@@ -101,7 +103,7 @@ async def authenticate_overseerr(email: str, password: str) -> dict | None:
 async def overseerr_auth_setup(email: str, password: str):
     """Proxy login to Overseerr and set session cookie.
 
-    This endpoint should be accessed via overseerr.blaha.io/blaha-auth-setup
+    This endpoint should be accessed via overseerr.{BASE_DOMAIN}/blaha-auth-setup
     so the cookie is set on the correct domain.
     """
     from fastapi.responses import Response, RedirectResponse
@@ -118,16 +120,19 @@ async def overseerr_auth_setup(email: str, password: str):
             )
             if resp.status_code == 200:
                 # Create redirect response and copy cookies
-                redirect = RedirectResponse(url="https://overseerr.blaha.io", status_code=302)
+                redirect = RedirectResponse(url=f"https://overseerr.{BASE_DOMAIN}", status_code=302)
                 for cookie_name, cookie_value in resp.cookies.items():
-                    redirect.set_cookie(
-                        key=cookie_name,
-                        value=cookie_value,
-                        domain=".blaha.io",
-                        httponly=True,
-                        secure=True,
-                        samesite="lax"
-                    )
+                    cookie_kwargs = {
+                        "key": cookie_name,
+                        "value": cookie_value,
+                        "httponly": True,
+                        "samesite": "lax"
+                    }
+                    # Only set domain and secure for non-localhost
+                    if COOKIE_DOMAIN:
+                        cookie_kwargs["domain"] = COOKIE_DOMAIN
+                        cookie_kwargs["secure"] = True
+                    redirect.set_cookie(**cookie_kwargs)
                 return redirect
             else:
                 return Response(content=f"Auth failed: {resp.status_code}", status_code=401)

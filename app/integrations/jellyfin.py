@@ -1,4 +1,4 @@
-"""Jellyfin integration for blaha.io"""
+"""Jellyfin integration - auto-login via localStorage token injection"""
 import os
 import secrets
 import httpx
@@ -8,6 +8,7 @@ from services.session import verify_admin
 
 JELLYFIN_URL = os.environ.get("JELLYFIN_URL", "")
 JELLYFIN_API_KEY = os.environ.get("JELLYFIN_API_KEY", "")
+BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
 
 router = APIRouter(prefix="/api/jellyfin", tags=["jellyfin"])
 
@@ -99,11 +100,12 @@ async def jellyfin_auth_setup(
 ):
     """Serve the localStorage setup page for Jellyfin auto-login.
 
-    This endpoint is accessed via jellyfin.blaha.io/blaha-auth-setup so that
-    localStorage is set on the correct domain (jellyfin.blaha.io).
+    This endpoint is accessed via jellyfin.{BASE_DOMAIN}/blaha-auth-setup so that
+    localStorage is set on the correct domain.
     """
     from fastapi.responses import HTMLResponse
 
+    jellyfin_base = f"https://jellyfin.{BASE_DOMAIN}"
     html = f"""<!DOCTYPE html>
 <html>
 <head><title>Signing into Jellyfin...</title></head>
@@ -116,16 +118,16 @@ const credentials = {{
         Id: "{server_id}",
         Name: "Jellyfin",
         LocalAddress: "{JELLYFIN_URL}",
-        ManualAddress: "https://jellyfin.blaha.io",
+        ManualAddress: "{jellyfin_base}",
         AccessToken: "{access_token}",
         UserId: "{user_id}",
         DateLastAccessed: Date.now()
     }}]
 }};
 localStorage.setItem('jellyfin_credentials', JSON.stringify(credentials));
-window.location.href = 'https://jellyfin.blaha.io/web/index.html#!/home.html';
+window.location.href = '{jellyfin_base}/web/index.html#!/home.html';
 </script>
-<noscript>JavaScript is required. <a href="https://jellyfin.blaha.io">Go to Jellyfin</a></noscript>
+<noscript>JavaScript is required. <a href="{jellyfin_base}">Go to Jellyfin</a></noscript>
 </div>
 </body>
 </html>"""
