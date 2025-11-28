@@ -13,6 +13,7 @@ from services.session import (
 from integrations.ombi import authenticate_ombi, OMBI_URL
 from integrations.jellyfin import authenticate_jellyfin, JELLYFIN_URL
 from integrations.overseerr import OVERSEERR_URL
+from services.activity import log_activity, ACTION_SERVICE_CLICK
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changeme")
 BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "")
@@ -105,14 +106,26 @@ async def forward_auth_verify(
                 # Check if friend has access to this service (by subdomain)
                 subdomain = x_forwarded_host.split(".")[0] if x_forwarded_host else ""
                 cursor = await db.execute(
-                    """SELECT s.name FROM services s
+                    """SELECT s.id, s.name FROM services s
                        JOIN friend_services fs ON s.id = fs.service_id
                        WHERE fs.friend_id = ? AND s.subdomain = ?""",
                     (session["user_id"], subdomain)
                 )
-                has_access = await cursor.fetchone()
+                service = await cursor.fetchone()
 
-                if has_access:
+                if service:
+                    # Log service access (forward auth is called on each request,
+                    # so we only log the first access per path to avoid spam)
+                    path = x_original_uri or "/"
+                    if path == "/" or path.endswith("/"):
+                        await log_activity(
+                            db, ACTION_SERVICE_CLICK,
+                            friend_id=session["user_id"],
+                            service_id=service["id"],
+                            details=f"nginx:{subdomain}"
+                        )
+                        await db.commit()
+
                     response_headers["X-Remote-User"] = friend["name"]
                     response_headers["X-Remote-Email"] = f"{friend['name'].lower().replace(' ', '')}@friends.{BASE_DOMAIN}"
                     return Response(status_code=200, headers=response_headers)

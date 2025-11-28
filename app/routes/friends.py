@@ -13,6 +13,10 @@ from services.friend_auth import (
     hash_password, generate_totp_secret, get_totp_uri,
     PASSWORD_NOT_REQUIRED, PASSWORD_ALWAYS_REQUIRED, PASSWORD_AFTER_THRESHOLD
 )
+from services.activity import (
+    log_activity, ACTION_PAGE_VIEW, ACTION_SERVICE_CLICK,
+    ACTION_AUTH_LOGIN, ACTION_CREDENTIAL_VIEW
+)
 from integrations.plex import get_plex_account, delete_plex_user
 from integrations.ombi import delete_ombi_user
 from integrations.jellyfin import delete_jellyfin_user
@@ -258,6 +262,9 @@ async def get_friend_view(token: str, authenticated: bool = False):
             "UPDATE friends SET last_visit = ? WHERE id = ?",
             (datetime.now().isoformat(), friend["id"])
         )
+
+        # Log page view activity
+        await log_activity(db, ACTION_PAGE_VIEW, friend_id=friend["id"])
         await db.commit()
 
         # Re-check auth requirements after incrementing (threshold may have been crossed)
@@ -462,4 +469,49 @@ async def get_friend_credentials(token: str, service_key: str):
         if not username or not password:
             raise HTTPException(status_code=404, detail="No credentials stored")
 
+        # Log credential view
+        await log_activity(
+            db, ACTION_CREDENTIAL_VIEW,
+            friend_id=friend["id"],
+            details=service_key
+        )
+        await db.commit()
+
         return {"username": username, "password": password}
+
+
+@public_router.post("/f/{token}/click/{service_id}")
+async def log_service_click(token: str, service_id: int):
+    """Log when a friend clicks a service link."""
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+
+        cursor = await db.execute(
+            "SELECT id FROM friends WHERE token = ?",
+            (token,)
+        )
+        friend = await cursor.fetchone()
+
+        if not friend:
+            raise HTTPException(status_code=404, detail="Invalid link")
+
+        # Verify service exists and friend has access
+        cursor = await db.execute(
+            """SELECT s.name FROM services s
+               JOIN friend_services fs ON s.id = fs.service_id
+               WHERE s.id = ? AND fs.friend_id = ?""",
+            (service_id, friend["id"])
+        )
+        service = await cursor.fetchone()
+
+        if not service:
+            raise HTTPException(status_code=404, detail="Service not found")
+
+        await log_activity(
+            db, ACTION_SERVICE_CLICK,
+            friend_id=friend["id"],
+            service_id=service_id
+        )
+        await db.commit()
+
+        return {"status": "ok"}

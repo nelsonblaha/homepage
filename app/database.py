@@ -73,6 +73,20 @@ async def init_db():
             )
         """)
 
+        # Activity log for admin dashboard
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS activity_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                friend_id INTEGER,
+                service_id INTEGER,
+                action TEXT NOT NULL,
+                details TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (friend_id) REFERENCES friends(id) ON DELETE SET NULL,
+                FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL
+            )
+        """)
+
         # =====================================================================
         # MIGRATIONS FOR services TABLE
         # =====================================================================

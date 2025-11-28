@@ -11,6 +11,7 @@ from routes.auth import router as auth_router
 from routes.services import router as services_router
 from routes.friends import router as friends_router, public_router as friends_public_router
 from routes.requests import router as requests_router
+from routes.activity import router as activity_router
 from integrations.plex import router as plex_router
 from integrations.ombi import router as ombi_router
 from integrations.jellyfin import router as jellyfin_router
@@ -34,6 +35,7 @@ app.include_router(services_router)
 app.include_router(friends_router)
 app.include_router(friends_public_router, prefix="/api")
 app.include_router(requests_router)
+app.include_router(activity_router)
 app.include_router(plex_router)
 app.include_router(ombi_router)
 app.include_router(jellyfin_router)
