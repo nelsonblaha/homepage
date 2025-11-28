@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master]
 
+env:
+  # Unique project name per run to avoid conflicts
+  CI_PROJECT: blaha-ci-${{ github.run_id }}
+
 jobs:
   # Fast unit tests without external dependencies
   unit-tests:
@@ -26,7 +30,7 @@ jobs:
         env:
           ADMIN_PASSWORD: testpassword
           SESSION_SECRET: testsecret1234567890abcdef
-          DB_PATH: /tmp/test-unit.db
+          DB_PATH: /tmp/test-unit-${{ github.run_id }}.db
           BASE_DOMAIN: localhost
           COOKIE_DOMAIN: ""
         run: |
@@ -53,7 +57,7 @@ jobs:
         if: always()
         run: pkill -f "uvicorn main:app" || true
 
-  # Integration tests with real containers (Ombi, Jellyfin)
+  # Integration tests with real containers (Ombi, etc.)
   integration-tests:
     runs-on: self-hosted
     needs: unit-tests
@@ -69,12 +73,30 @@ jobs:
       - name: Install Python test dependencies
         run: pip install requests
 
-      - name: Start test containers
+      - name: Cleanup any previous CI containers
         run: |
-          docker compose -p blaha-ci -f docker-compose.ci.yml down -v --remove-orphans || true
-          docker compose -p blaha-ci -f docker-compose.ci.yml up -d ombi
-          echo "Waiting for Ombi to initialize (this takes a while on first run)..."
-          sleep 60
+          docker compose -p $CI_PROJECT -f docker-compose.ci.yml down -v --remove-orphans 2>/dev/null || true
+
+      - name: Start test containers
+        env:
+          CI_RUN_ID: ${{ github.run_id }}
+        run: |
+          docker compose -p $CI_PROJECT -f docker-compose.ci.yml up -d ombi
+          echo "Waiting for Ombi to become healthy..."
+
+      - name: Wait for Ombi
+        run: |
+          for i in $(seq 1 120); do
+            if curl -s -o /dev/null -w "%{http_code}" http://localhost:3580/ | grep -q "200\|302"; then
+              echo "Ombi is ready after $i attempts"
+              exit 0
+            fi
+            echo "Attempt $i/120 - Ombi not ready yet..."
+            sleep 5
+          done
+          echo "ERROR: Ombi failed to start after 10 minutes"
+          docker compose -p $CI_PROJECT -f docker-compose.ci.yml logs ombi
+          exit 1
 
       - name: Setup Ombi for CI
         id: ombi-setup
@@ -91,7 +113,7 @@ jobs:
         env:
           ADMIN_PASSWORD: testpassword
           SESSION_SECRET: testsecret1234567890abcdef
-          DB_PATH: /tmp/test-integration.db
+          DB_PATH: /tmp/test-integration-${{ github.run_id }}.db
           BASE_DOMAIN: localhost
           COOKIE_DOMAIN: ""
           OMBI_URL: http://localhost:3580
@@ -122,8 +144,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose -p blaha-ci -f docker-compose.ci.yml down -v --remove-orphans || true
+          docker compose -p $CI_PROJECT -f docker-compose.ci.yml down -v --remove-orphans || true
           pkill -f "uvicorn main:app" || true
+          rm -f /tmp/test-integration-${{ github.run_id }}.db /tmp/test-unit-${{ github.run_id }}.db
 
   deploy:
     needs: [unit-tests, integration-tests]
