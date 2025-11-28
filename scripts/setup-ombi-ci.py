@@ -11,22 +11,26 @@ import sys
 import os
 
 OMBI_URL = os.environ.get('OMBI_URL', 'http://localhost:3579')
-MAX_RETRIES = 60  # Ombi takes a long time on first run
-RETRY_DELAY = 5   # 60 * 5 = 5 minutes max wait
+MAX_RETRIES = 120  # Ombi takes a long time on first run
+RETRY_DELAY = 5    # 120 * 5 = 10 minutes max wait
 
 
 def wait_for_ombi():
     """Wait for Ombi to be ready."""
-    print(f"Waiting for Ombi at {OMBI_URL}...")
+    print(f"Waiting for Ombi at {OMBI_URL}...", flush=True)
     for i in range(MAX_RETRIES):
         try:
-            resp = requests.get(f"{OMBI_URL}/api/v1/Settings/About", timeout=5)
+            # Use /api/v1/Status - same endpoint as CI shell script
+            resp = requests.get(f"{OMBI_URL}/api/v1/Status", timeout=5)
             if resp.status_code == 200:
-                print("Ombi is ready!")
+                print("Ombi is ready!", flush=True)
                 return True
-        except requests.exceptions.RequestException:
-            pass
-        print(f"Attempt {i+1}/{MAX_RETRIES} - Ombi not ready yet...")
+            # Got non-200 response
+            if i % 10 == 0:  # Only log every 10th attempt
+                print(f"Attempt {i+1}/{MAX_RETRIES} - Got {resp.status_code}", flush=True)
+        except requests.exceptions.RequestException as e:
+            if i % 10 == 0:  # Only log every 10th attempt
+                print(f"Attempt {i+1}/{MAX_RETRIES} - Connection error: {type(e).__name__}", flush=True)
         time.sleep(RETRY_DELAY)
     return False
 
