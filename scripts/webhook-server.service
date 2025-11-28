@@ -1,0 +1,15 @@
+[Unit]
+Description=GitHub Deploy Webhook Server for blaha-homepage
+After=network.target
+
+[Service]
+Type=simple
+User=ben
+WorkingDirectory=/home/ben/docker/blaha-homepage
+EnvironmentFile=/home/ben/docker/blaha-homepage/.env.webhook
+ExecStart=/usr/bin/python3 /home/ben/docker/blaha-homepage/scripts/webhook-server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
