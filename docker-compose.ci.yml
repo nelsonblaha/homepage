@@ -4,6 +4,7 @@
 services:
   ombi:
     image: linuxserver/ombi:latest
+    container_name: ombi-ci-${CI_RUN_ID:-local}
     environment:
       - PUID=1000
       - PGID=1000
@@ -20,6 +21,7 @@ services:
       start_period: 120s
     networks:
       - ci-network
+      - shared
 
   jellyfin:
     image: linuxserver/jellyfin:latest
@@ -108,3 +110,7 @@ networks:
   ci-network:
     driver: bridge
     name: blaha-ci-isolated-${CI_RUN_ID:-local}
+  # Shared network for runner-container communication
+  shared:
+    external: true
+    name: blaha-ci-shared

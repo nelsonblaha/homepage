@@ -161,35 +161,22 @@ jobs:
 
       - name: Wait for Ombi API
         env:
-          OMBI_PORT: ${{ env.OMBI_PORT }}
+          CI_RUN_ID: ${{ github.run_id }}
         run: |
-          # Get host IP dynamically (works from containerized runners)
-          # Try multiple methods to find reachable host
-          if command -v ip &> /dev/null; then
-            GATEWAY_IP=$(ip route | grep default | awk '{print $3}' | head -1)
-          fi
+          # Use container name on shared network for runner-to-container communication
+          OMBI_CONTAINER="ombi-ci-$CI_RUN_ID"
+          OMBI_PORT=3579  # Internal port, accessed via shared network
 
-          # Try host.docker.internal (Docker Desktop), gateway, or fallback
-          for OMBI_HOST in "${DOCKER_HOST_IP:-}" "host.docker.internal" "${GATEWAY_IP:-}" "172.17.0.1" "localhost"; do
-            [ -z "$OMBI_HOST" ] && continue
-            echo "Testing connectivity to $OMBI_HOST..."
-            if curl -s --max-time 2 "http://$OMBI_HOST:$OMBI_PORT/" &>/dev/null; then
-              echo "Found reachable host: $OMBI_HOST"
-              break
-            fi
-          done
-
-          echo "Waiting for Ombi API to be ready at $OMBI_HOST:$OMBI_PORT..."
+          echo "Waiting for Ombi container $OMBI_CONTAINER to be ready..."
 
           # First verify container is running
-          docker ps | grep ombi || echo "WARNING: No Ombi container found!"
+          docker ps | grep "$OMBI_CONTAINER" || echo "WARNING: Container $OMBI_CONTAINER not found!"
 
           for i in $(seq 1 120); do
-            # Use /api/v1/Status - it's public and returns 200 when ready
-            # Add 5 second timeout to curl
-            if curl -s --max-time 5 "http://$OMBI_HOST:$OMBI_PORT/api/v1/Status" | grep -q "200"; then
+            # Access Ombi via container name on shared network (internal port 3579)
+            if curl -s --max-time 5 "http://$OMBI_CONTAINER:$OMBI_PORT/api/v1/Status" | grep -q "200"; then
               echo "Ombi API is ready after $i attempts"
-              echo "OMBI_HOST=$OMBI_HOST" >> $GITHUB_ENV
+              echo "OMBI_CONTAINER=$OMBI_CONTAINER" >> $GITHUB_ENV
               exit 0
             fi
             echo "Attempt $i/120 - Ombi API not ready yet..."
@@ -202,7 +189,7 @@ jobs:
       - name: Setup Ombi for CI
         id: ombi-setup
         env:
-          OMBI_URL: http://${{ env.OMBI_HOST }}:${{ env.OMBI_PORT }}
+          OMBI_URL: http://${{ env.OMBI_CONTAINER }}:3579
         run: |
           chmod +x scripts/setup-ombi-ci.py
           python scripts/setup-ombi-ci.py
@@ -217,7 +204,7 @@ jobs:
           DB_PATH: /tmp/test-integration-${{ github.run_id }}.db
           BASE_DOMAIN: localhost
           COOKIE_DOMAIN: ""
-          OMBI_URL: http://${{ env.OMBI_HOST }}:${{ env.OMBI_PORT }}
+          OMBI_URL: http://${{ env.OMBI_CONTAINER }}:3579
           OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
         run: |
           pip install -r requirements.txt
@@ -239,7 +226,7 @@ jobs:
         env:
           CYPRESS_BASE_URL: http://localhost:8100
           CYPRESS_ADMIN_PASSWORD: testpassword
-          CYPRESS_OMBI_URL: http://${{ env.OMBI_HOST }}:${{ env.OMBI_PORT }}
+          CYPRESS_OMBI_URL: http://${{ env.OMBI_CONTAINER }}:3579
           CYPRESS_OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
 
       - name: Cleanup
