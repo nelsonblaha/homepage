@@ -142,7 +142,8 @@ describe('Ombi E2E Integration', () => {
   describe('Friend Login Flow', () => {
     it('should visit friend link and see their homepage', function() {
       if (!friendLink) {
-        // Get friend link from API if not captured from UI
+        // Get friend link from API if not captured from UI (requires admin auth)
+        cy.adminLogin()
         cy.request('/api/friends').then((response) => {
           const friend = response.body.find(f => f.name === testFriendName)
           if (friend) {
@@ -211,6 +212,8 @@ describe('Ombi E2E Integration', () => {
       // Friend's Ombi username is their name, password is stored in DB
       // We verify the account exists by checking the user list via API
 
+      // Need admin auth to access /api/friends
+      cy.adminLogin()
       cy.request('/api/friends').then((friendsResponse) => {
         const friend = friendsResponse.body.find(f => f.name === testFriendName)
         if (!friend || !friend.ombi_user_id) {
