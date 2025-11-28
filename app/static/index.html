@@ -884,6 +884,13 @@
                     this.fetchJitsiParticipants();
                     setInterval(() => this.fetchJitsiParticipants(), 5000);
 
+                    // Start CI status polling (every 60 seconds)
+                    setInterval(() => {
+                        if (this.view === 'admin' || this.view === 'admin-services') {
+                            this.loadCIStatus();
+                        }
+                    }, 60000);
+
                     // Handle browser back/forward for admin tabs
                     window.addEventListener('popstate', (event) => {
                         if (event.state?.tab) {
