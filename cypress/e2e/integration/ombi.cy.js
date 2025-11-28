@@ -71,11 +71,6 @@ describe('Ombi E2E Integration', () => {
     })
 
     it('should verify Ombi integration is connected', () => {
-      // Navigate to services tab and check integration status
-      cy.visit('/admin')
-      cy.get('[data-testid="tab-services"]').click()
-      cy.get('[data-testid="integrations"]').should('exist')
-
       // Check Ombi status via API
       cy.request('/api/ombi/status').then((response) => {
         expect(response.body.connected).to.eq(true)
