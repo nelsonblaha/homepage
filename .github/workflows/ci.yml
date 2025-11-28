@@ -42,6 +42,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Kill any stale processes on test ports
+        run: |
+          # Kill anything using our test ports (from previous runs)
+          for port in 5000 8100; do
+            pid=$(lsof -t -i:$port 2>/dev/null || true)
+            if [ -n "$pid" ]; then
+              echo "Killing process $pid on port $port"
+              kill -9 $pid 2>/dev/null || true
+            fi
+          done
+          sleep 2
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -88,6 +100,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Kill any stale processes on test ports
+        run: |
+          # Kill anything using our test ports (from previous runs)
+          for port in 5000 8100; do
+            pid=$(lsof -t -i:$port 2>/dev/null || true)
+            if [ -n "$pid" ]; then
+              echo "Killing process $pid on port $port"
+              kill -9 $pid 2>/dev/null || true
+            fi
+          done
+          sleep 2
 
       - name: Set up Python
         uses: actions/setup-python@v5
