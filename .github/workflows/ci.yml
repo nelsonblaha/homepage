@@ -45,6 +45,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Cypress dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 || \
+          sudo apt-get install -y xvfb libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2
+
       - name: Kill any stale processes on test ports
         timeout-minutes: 1
         run: |
@@ -104,6 +110,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Cypress dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 || \
+          sudo apt-get install -y xvfb libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2
 
       - name: Kill any stale processes on test ports
         timeout-minutes: 1
