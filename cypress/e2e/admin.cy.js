@@ -10,7 +10,7 @@ describe('Admin Authentication', () => {
 
   it('should show error on invalid password', () => {
     cy.get('input[type="password"]').type('wrongpassword')
-    cy.get('button[type="submit"]').click()
+    cy.get('[data-testid="login-btn"]').click()
     cy.get('[data-testid="error"]').should('be.visible')
   })
 })
