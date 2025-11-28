@@ -292,7 +292,12 @@ async def increment_usage(db, friend_id: int) -> int:
         (friend_id,)
     )
     row = await cursor.fetchone()
-    return row[0] if row else 0
+    if not row:
+        return 0
+    # Handle both dict (when row_factory is set) and tuple (default) results
+    if isinstance(row, dict):
+        return row.get("usage_count", 0)
+    return row[0]
 
 
 async def set_friend_password(db, friend_id: int, password: str) -> bool:
