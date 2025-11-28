@@ -253,15 +253,16 @@ jobs:
         run: |
           cd $DEPLOY_PATH
 
-          # Add GitHub's SSH host key (runner containers are ephemeral)
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-
           # Mark directory as safe (runner user differs from owner)
           git config --global --add safe.directory $DEPLOY_PATH
 
-          # Pull latest code
-          git pull origin main
+          # Pull latest code using HTTPS with GitHub token (SSH not available in container)
+          git remote set-url origin https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Restore SSH remote URL for local use
+          git remote set-url origin git@github.com:${{ github.repository }}.git
 
           # Rebuild and restart containers
           docker compose down
