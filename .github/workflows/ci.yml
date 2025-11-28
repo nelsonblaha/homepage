@@ -249,19 +249,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to production
+      - name: Sync code to production directory
         run: |
-          # Deploy using the mounted production directory
+          # Copy checked-out code to production directory (excluding .git and data)
+          rsync -av --delete \
+            --exclude '.git' \
+            --exclude 'data/' \
+            --exclude '.env' \
+            --exclude '.env.webhook' \
+            --exclude '__pycache__' \
+            --exclude 'node_modules' \
+            $GITHUB_WORKSPACE/ /home/ben/docker/blaha-homepage/
+
+      - name: Deploy containers
+        run: |
           cd /home/ben/docker/blaha-homepage
-
-          # Mark directory as safe (runner user differs from owner)
-          git config --global --add safe.directory /home/ben/docker/blaha-homepage
-
-          # Pull latest
-          git pull origin main
-
-          # Rebuild and restart the container
           docker compose down
           docker compose up -d --build
-
           echo "Deploy complete!"
