@@ -247,13 +247,10 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Deploy to production
         env:
-          # Set DEPLOY_PATH in your runner environment or GitHub secrets
-          # Example: DEPLOY_PATH=/opt/blaha-homepage
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || github.workspace }}
+          # Production path on nelnet server
+          DEPLOY_PATH: /home/ben/docker/blaha-homepage
         run: |
           cd "$DEPLOY_PATH"
           git pull origin main || true
