@@ -1,5 +1,7 @@
 # Service Homepage
 
+[![CI](https://github.com/nelsonblaha/homepage/actions/workflows/ci.yml/badge.svg)](https://github.com/nelsonblaha/homepage/actions/workflows/ci.yml)
+
 A personal homepage for managing and sharing access to self-hosted services with friends.
 
 ## Features
@@ -206,6 +208,10 @@ blaha-homepage/
 
 ### Authentication
 - `GET /auth/{subdomain}` - Unified auth redirect for friends (handles auto-login)
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
