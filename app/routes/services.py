@@ -5,10 +5,22 @@ from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from models import Service, ServiceCreate
 from services.session import verify_admin
+from integrations.registry import SERVICE_DB_COLUMNS, get_integration
 
 BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "admin")
 BASIC_AUTH_PASS = os.environ.get("BASIC_AUTH_PASS", "")
 BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")
+
+# Map service names to their integration slugs
+SERVICE_NAME_TO_SLUG = {
+    "plex": "plex",
+    "ombi": "ombi",
+    "jellyfin": "jellyfin",
+    "nextcloud": "nextcloud",
+    "overseerr": "overseerr",
+    "mattermost": "mattermost",
+    "chat": "mattermost",
+}
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -97,3 +109,96 @@ async def get_preauth_url(service_id: int, _: bool = Depends(verify_admin)):
         preauth_url = f"https://{user}:{passwd}@{service['subdomain']}.{BASE_DOMAIN}/"
 
         return {"url": preauth_url, "service": service["name"]}
+
+
+@router.get("/{service_id}/integration-status")
+async def get_integration_status(service_id: int, _: bool = Depends(verify_admin)):
+    """Get integration status for a managed service (Plex, Ombi, Jellyfin, etc.)."""
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        cursor = await db.execute("SELECT * FROM services WHERE id = ?", (service_id,))
+        service = await cursor.fetchone()
+
+        if not service:
+            raise HTTPException(status_code=404, detail="Service not found")
+
+        service_slug = SERVICE_NAME_TO_SLUG.get(service["name"].lower())
+        if not service_slug:
+            return {"managed": False}
+
+        # Get db columns for this service
+        columns = SERVICE_DB_COLUMNS.get(service_slug)
+        if not columns:
+            return {"managed": False}
+
+        user_id_col = columns[0]
+
+        # Count friends with accounts for this service
+        cursor = await db.execute(
+            f"""SELECT COUNT(*) as count FROM friends
+               WHERE {user_id_col} IS NOT NULL AND {user_id_col} != ''"""
+        )
+        account_count = (await cursor.fetchone())["count"]
+
+        # Count friends granted access to this service
+        cursor = await db.execute(
+            """SELECT COUNT(*) as count FROM friend_services WHERE service_id = ?""",
+            (service_id,)
+        )
+        granted_count = (await cursor.fetchone())["count"]
+
+        # Check if integration is connected (has status endpoint)
+        integration = get_integration(service_slug)
+        connected = False
+        if integration and hasattr(integration, "check_status"):
+            try:
+                status = await integration.check_status()
+                connected = status.get("connected", False)
+            except Exception:
+                connected = False
+
+        return {
+            "managed": True,
+            "slug": service_slug,
+            "connected": connected,
+            "accounts_created": account_count,
+            "friends_granted": granted_count,
+        }
+
+
+@router.get("/integrations-summary")
+async def get_integrations_summary(_: bool = Depends(verify_admin)):
+    """Get summary of all managed service integrations."""
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+
+        summary = {}
+        for slug, columns in SERVICE_DB_COLUMNS.items():
+            if slug == "chat":  # Skip alias
+                continue
+
+            user_id_col = columns[0]
+
+            # Count friends with accounts
+            cursor = await db.execute(
+                f"""SELECT COUNT(*) as count FROM friends
+                   WHERE {user_id_col} IS NOT NULL AND {user_id_col} != ''"""
+            )
+            account_count = (await cursor.fetchone())["count"]
+
+            # Check if integration is connected
+            integration = get_integration(slug)
+            connected = False
+            if integration and hasattr(integration, "check_status"):
+                try:
+                    status = await integration.check_status()
+                    connected = status.get("connected", False)
+                except Exception:
+                    connected = False
+
+            summary[slug] = {
+                "connected": connected,
+                "accounts_created": account_count,
+            }
+
+        return summary

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>blaha.io</title>
+    <title>Homepage</title>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -25,7 +25,7 @@
         <!-- PUBLIC LANDING -->
         <template x-if="view === 'public'">
             <div class="flex flex-col items-center justify-center min-h-screen px-4">
-                <h1 class="text-6xl font-bold text-blue-400 mb-4">blaha.io</h1>
+                <h1 class="text-6xl font-bold text-blue-400 mb-4" x-text="baseDomain"></h1>
                 <p class="text-gray-500 text-sm mb-8">Private services</p>
 
                 <!-- Admin Login -->
@@ -56,7 +56,7 @@
             <div class="max-w-4xl mx-auto px-4 py-12">
                 <div class="text-center mb-12">
                     <h1 class="text-4xl font-bold text-blue-300 mb-2">Welcome, <span x-text="friendName"></span></h1>
-                    <p class="text-xl text-gray-400">blaha.io</p>
+                    <p class="text-xl text-gray-400" x-text="baseDomain"></p>
                 </div>
 
                 <div x-show="friendError" class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-6">
@@ -145,7 +145,7 @@
         <template x-if="view === 'request-access'">
             <div class="flex flex-col items-center justify-center min-h-screen px-4">
                 <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md text-center">
-                    <h1 class="text-3xl font-bold text-blue-400 mb-2">blaha.io</h1>
+                    <h1 class="text-3xl font-bold text-blue-400 mb-2" x-text="baseDomain"></h1>
 
                     <template x-if="!requestInfo.friend_name">
                         <div>
@@ -237,7 +237,7 @@
                 </div>
 
                 <div class="text-center mb-12">
-                    <h1 class="text-4xl font-bold text-blue-400 mb-2">blaha.io</h1>
+                    <h1 class="text-4xl font-bold text-blue-400 mb-2" x-text="baseDomain"></h1>
                     <p class="text-xl text-gray-300">All Services</p>
                 </div>
 
@@ -280,7 +280,7 @@
         <template x-if="view === 'admin'">
             <div class="max-w-6xl mx-auto px-4 py-8">
                 <div class="flex justify-between items-center mb-8">
-                    <h1 class="text-3xl font-bold text-blue-400">blaha.io Admin</h1>
+                    <h1 class="text-3xl font-bold text-blue-400"><span x-text="baseDomain"></span> Admin</h1>
                     <div class="flex items-center gap-4">
                         <a href="/" class="text-blue-400 hover:text-blue-300 text-sm">Services</a>
                         <button @click="adminLogout" class="text-gray-400 hover:text-white" data-testid="logout-btn">Logout</button>
@@ -416,20 +416,9 @@
                                             <div class="flex items-center gap-2">
                                                 <a :href="'/f/' + friend.token" data-testid="friend-link"
                                                    class="text-sm text-gray-400 bg-gray-700 px-2 py-1 rounded hover:text-blue-300"
-                                                   x-text="'blaha.io/f/' + friend.token"></a>
+                                                   x-text="baseDomain + '/f/' + friend.token"></a>
                                                 <button @click.stop="copyUrl(friend.token)"
                                                         class="text-blue-400 hover:text-blue-300 text-sm">Copy</button>
-                                            </div>
-                                            <!-- Account Status -->
-                                            <div class="flex items-center gap-3 mt-2 text-xs">
-                                                <span x-show="friend.plex_user_id" class="text-green-400 flex items-center gap-1">
-                                                    📺 Plex
-                                                    <span x-show="friend.plex_pin" class="text-gray-500">(PIN: <span x-text="friend.plex_pin"></span>)</span>
-                                                </span>
-                                                <span x-show="friend.ombi_user_id" class="text-green-400">🎬 Ombi</span>
-                                                <span x-show="friend.jellyfin_user_id" class="text-green-400">🎞️ Jellyfin</span>
-                                                <span x-show="friend.nextcloud_user_id" class="text-green-400">☁️ Nextcloud</span>
-                                                <span x-show="friend.overseerr_user_id" class="text-green-400">🎫 Overseerr</span>
                                             </div>
                                         </div>
                                         <button @click.stop="deleteFriend(friend.id)"
@@ -495,186 +484,99 @@
                 </div>
 
                 <!-- SERVICES TAB -->
-                <div x-show="adminTab === 'services'" x-data="{ expandedStacks: {} }" data-testid="services-panel">
-                    <!-- Default Services List -->
-                    <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
-                        <div class="bg-gray-700 px-4 py-3 flex items-center justify-between">
-                            <h3 class="font-semibold">Default Services <span class="text-gray-400 text-sm font-normal">(granted to new friends)</span></h3>
-                        </div>
-                        <table class="w-full">
-                            <thead class="bg-gray-750">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
-                                    <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
-                                    <th class="px-4 py-2 text-left text-sm text-gray-400">Description</th>
-                                    <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
-                                    <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="service in services.filter(s => s.is_default)" :key="service.id">
-                                    <tr class="border-t border-gray-700">
-                                        <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
-                                        <td class="px-4 py-3">
-                                            <template x-if="editingNameId !== service.id">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="font-medium" x-text="service.name"></span>
-                                                    <button @click="startEditName(service)"
-                                                            class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
-                                                </div>
-                                            </template>
-                                            <template x-if="editingNameId === service.id">
-                                                <div class="flex items-center gap-2">
-                                                    <input type="text" x-model="editingName"
-                                                           @keyup.enter="saveName(service)"
-                                                           @keyup.escape="cancelEditName()"
-                                                           class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500">
-                                                    <button @click="saveName(service)"
-                                                            class="text-green-400 hover:text-green-300 text-xs">Save</button>
-                                                    <button @click="cancelEditName()"
-                                                            class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
-                                                </div>
-                                            </template>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm max-w-xs">
-                                            <template x-if="editingServiceId !== service.id">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-gray-400" x-text="service.description || '-'"></span>
-                                                    <button @click="startEditDescription(service)"
-                                                            class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
-                                                </div>
-                                            </template>
-                                            <template x-if="editingServiceId === service.id">
-                                                <div class="flex items-center gap-2">
-                                                    <input type="text" x-model="editingDescription"
-                                                           @keyup.enter="saveDescription(service)"
-                                                           @keyup.escape="cancelEditDescription()"
-                                                           class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm w-full focus:outline-none focus:border-blue-500">
-                                                    <button @click="saveDescription(service)"
-                                                            class="text-green-400 hover:text-green-300 text-xs">Save</button>
-                                                    <button @click="cancelEditDescription()"
-                                                            class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
-                                                </div>
-                                            </template>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm truncate max-w-xs">
-                                            <a :href="service.url"
-                                               target="_blank"
-                                               class="text-blue-400 hover:text-blue-300 hover:underline"
-                                               x-text="service.subdomain ? service.subdomain + '.blaha.io' : service.url"></a>
-                                        </td>
-                                        <td class="px-4 py-3 text-right space-x-2">
-                                            <button @click="toggleServiceDefault(service)"
-                                                    class="text-yellow-400 hover:text-yellow-300 text-sm">Remove Default</button>
-                                            <button x-show="supportsAuthUrl(service)" @click="copyPreauthUrl(service.id)"
-                                                    class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
-                                            <button @click="deleteService(service.id)"
-                                                    class="text-red-400 hover:text-red-300 text-sm">Delete</button>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                        <template x-if="services.filter(s => s.is_default).length === 0">
-                            <div class="px-4 py-6 text-center text-gray-500">No default services configured</div>
-                        </template>
-                    </div>
+                <div x-show="adminTab === 'services'" x-data="{ expandedServices: {}, integrationStatus: {} }" x-init="loadIntegrationStatus()" data-testid="services-panel">
+                    <!-- Services List (grouped by stack) -->
+                    <template x-for="group in getGroupedServices(services)" :key="group.stack || 'other'">
+                        <div class="mb-6">
+                            <!-- Stack Header -->
+                            <div class="flex items-center gap-2 mb-3 px-2">
+                                <span class="text-xl" x-text="getStackIcon(group.stack)"></span>
+                                <span class="text-lg font-semibold text-gray-400" x-text="group.stack ? getStackLabel(group.stack) : 'Other'"></span>
+                                <span class="text-sm text-gray-500">(<span x-text="group.services.length"></span>)</span>
+                            </div>
 
-                    <!-- Other Services - Grouped by Stack -->
-                    <template x-for="group in getNonDefaultGroupedServices()" :key="group.stack || 'other'">
-                        <div class="bg-gray-800 rounded-lg overflow-hidden mb-4">
-                            <button @click="expandedStacks[group.stack || 'other'] = !expandedStacks[group.stack || 'other']"
-                                    class="w-full bg-gray-700 px-4 py-3 flex items-center justify-between hover:bg-gray-650 transition-colors">
-                                <h3 class="font-semibold flex items-center gap-2">
-                                    <span x-text="getStackIcon(group.stack)"></span>
-                                    <span x-text="group.stack ? getStackLabel(group.stack) : 'Other'"></span>
-                                    <span class="text-gray-400 text-sm font-normal">(<span x-text="group.services.length"></span>)</span>
-                                </h3>
-                                <span x-text="expandedStacks[group.stack || 'other'] ? '▼' : '▶'" class="text-gray-400"></span>
-                            </button>
-                            <div x-show="expandedStacks[group.stack || 'other']" x-transition:enter="transition ease-out duration-200"
-                                 x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                                 x-transition:leave="transition ease-in duration-150"
-                                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-                                <table class="w-full">
-                                    <thead class="bg-gray-750">
-                                        <tr>
-                                            <th class="px-4 py-2 text-left text-sm text-gray-400">Icon</th>
-                                            <th class="px-4 py-2 text-left text-sm text-gray-400">Name</th>
-                                            <th class="px-4 py-2 text-left text-sm text-gray-400">Description</th>
-                                            <th class="px-4 py-2 text-left text-sm text-gray-400">URL</th>
-                                            <th class="px-4 py-2 text-right text-sm text-gray-400">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <template x-for="service in group.services" :key="service.id">
-                                            <tr class="border-t border-gray-700">
-                                                <td class="px-4 py-3 text-2xl" x-text="service.icon || '-'"></td>
-                                                <td class="px-4 py-3">
-                                                    <template x-if="editingNameId !== service.id">
-                                                        <div class="flex items-center gap-2">
-                                                            <span class="font-medium" x-text="service.name"></span>
-                                                            <button @click="startEditName(service)"
-                                                                    class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
+                            <!-- Services in Stack -->
+                            <div class="space-y-2">
+                                <template x-for="service in group.services" :key="service.id">
+                                    <div class="bg-gray-800 rounded-lg overflow-hidden">
+                                        <!-- Collapsible Header -->
+                                        <button @click="expandedServices[service.id] = !expandedServices[service.id]"
+                                                class="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-750 transition-colors">
+                                            <div class="flex items-center gap-3">
+                                                <span x-text="expandedServices[service.id] ? '▼' : '▶'" class="text-gray-400 text-sm"></span>
+                                                <span class="text-xl" x-text="service.icon || '📦'"></span>
+                                                <span class="font-semibold" x-text="service.name"></span>
+                                                <span x-show="service.is_default" class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">default</span>
+                                                <!-- Integration badge -->
+                                                <span x-show="isManagedService(service)"
+                                                      :class="integrationStatus[service.name.toLowerCase()]?.connected ? 'text-green-400' : 'text-gray-500'"
+                                                      class="text-xs">
+                                                    <span x-show="integrationStatus[service.name.toLowerCase()]?.connected">● connected</span>
+                                                    <span x-show="!integrationStatus[service.name.toLowerCase()]?.connected">○ not connected</span>
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center gap-3 text-sm text-gray-400">
+                                                <span x-text="service.subdomain ? service.subdomain + '.' : ''"></span>
+                                            </div>
+                                        </button>
+
+                                        <!-- Expanded Content -->
+                                        <div x-show="expandedServices[service.id]" x-transition:enter="transition ease-out duration-200"
+                                             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                             class="px-4 pb-4 border-t border-gray-700">
+                                            <div class="pt-3 space-y-4">
+                                                <!-- URL & Description Row -->
+                                                <div class="flex flex-wrap gap-4 text-sm">
+                                                    <div>
+                                                        <span class="text-gray-500">URL:</span>
+                                                        <a :href="service.url" target="_blank"
+                                                           class="text-blue-400 hover:text-blue-300 ml-1"
+                                                           x-text="service.subdomain ? service.subdomain + '.' + baseDomain : service.url"></a>
+                                                    </div>
+                                                    <div x-show="service.description">
+                                                        <span class="text-gray-500">Description:</span>
+                                                        <span class="text-gray-300 ml-1" x-text="service.description"></span>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Integration Status (for managed services) -->
+                                                <div x-show="isManagedService(service)" class="bg-gray-700/50 rounded p-3">
+                                                    <div class="text-sm font-medium text-gray-300 mb-2">Integration</div>
+                                                    <div class="flex flex-wrap gap-4 text-sm">
+                                                        <div>
+                                                            <span class="text-gray-500">Status:</span>
+                                                            <span :class="integrationStatus[service.name.toLowerCase()]?.connected ? 'text-green-400' : 'text-red-400'" class="ml-1"
+                                                                  x-text="integrationStatus[service.name.toLowerCase()]?.connected ? 'Connected' : 'Not Connected'"></span>
                                                         </div>
-                                                    </template>
-                                                    <template x-if="editingNameId === service.id">
-                                                        <div class="flex items-center gap-2">
-                                                            <input type="text" x-model="editingName"
-                                                                   @keyup.enter="saveName(service)"
-                                                                   @keyup.escape="cancelEditName()"
-                                                                   class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500">
-                                                            <button @click="saveName(service)"
-                                                                    class="text-green-400 hover:text-green-300 text-xs">Save</button>
-                                                            <button @click="cancelEditName()"
-                                                                    class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
+                                                        <div>
+                                                            <span class="text-gray-500">Accounts:</span>
+                                                            <span class="text-gray-300 ml-1" x-text="integrationStatus[service.name.toLowerCase()]?.accounts_created || 0"></span>
                                                         </div>
-                                                    </template>
-                                                </td>
-                                                <td class="px-4 py-3 text-sm max-w-xs">
-                                                    <template x-if="editingServiceId !== service.id">
-                                                        <div class="flex items-center gap-2">
-                                                            <span class="text-gray-400" x-text="service.description || '-'"></span>
-                                                            <button @click="startEditDescription(service)"
-                                                                    class="text-blue-400 hover:text-blue-300 text-xs">Edit</button>
-                                                        </div>
-                                                    </template>
-                                                    <template x-if="editingServiceId === service.id">
-                                                        <div class="flex items-center gap-2">
-                                                            <input type="text" x-model="editingDescription"
-                                                                   @keyup.enter="saveDescription(service)"
-                                                                   @keyup.escape="cancelEditDescription()"
-                                                                   class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm w-full focus:outline-none focus:border-blue-500">
-                                                            <button @click="saveDescription(service)"
-                                                                    class="text-green-400 hover:text-green-300 text-xs">Save</button>
-                                                            <button @click="cancelEditDescription()"
-                                                                    class="text-gray-400 hover:text-gray-300 text-xs">Cancel</button>
-                                                        </div>
-                                                    </template>
-                                                </td>
-                                                <td class="px-4 py-3 text-sm truncate max-w-xs">
-                                                    <a :href="service.url"
-                                                       target="_blank"
-                                                       class="text-blue-400 hover:text-blue-300 hover:underline"
-                                                       x-text="service.subdomain ? service.subdomain + '.blaha.io' : service.url"></a>
-                                                </td>
-                                                <td class="px-4 py-3 text-right space-x-2">
+                                                    </div>
+                                                </div>
+
+                                                <!-- Actions -->
+                                                <div class="flex flex-wrap gap-2 pt-2">
                                                     <button @click="toggleServiceDefault(service)"
-                                                            class="text-green-400 hover:text-green-300 text-sm">Make Default</button>
+                                                            :class="service.is_default ? 'text-yellow-400 hover:text-yellow-300' : 'text-green-400 hover:text-green-300'"
+                                                            class="text-sm px-3 py-1 bg-gray-700 rounded hover:bg-gray-600"
+                                                            x-text="service.is_default ? 'Remove Default' : 'Make Default'"></button>
                                                     <button x-show="supportsAuthUrl(service)" @click="copyPreauthUrl(service.id)"
-                                                            class="text-blue-400 hover:text-blue-300 text-sm">Copy Auth URL</button>
+                                                            class="text-sm px-3 py-1 bg-gray-700 rounded text-blue-400 hover:text-blue-300 hover:bg-gray-600">Copy Auth URL</button>
+                                                    <button @click="startEditService(service)"
+                                                            class="text-sm px-3 py-1 bg-gray-700 rounded text-gray-300 hover:text-white hover:bg-gray-600">Edit</button>
                                                     <button @click="deleteService(service.id)"
-                                                            class="text-red-400 hover:text-red-300 text-sm">Delete</button>
-                                                </td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
+                                                            class="text-sm px-3 py-1 bg-gray-700 rounded text-red-400 hover:text-red-300 hover:bg-gray-600">Delete</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </template>
 
-                    <!-- Add Service Form (moved to bottom) -->
+                    <!-- Add Service Form -->
                     <div class="bg-gray-800 rounded-lg p-6">
                         <h3 class="text-lg font-semibold mb-4">Add Service</h3>
                         <form @submit.prevent="addService" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -731,6 +633,9 @@
                 editingName: '',
                 expandedFriends: {},
                 toast: { show: false, message: '' },
+
+                // Base domain (derived from current hostname)
+                baseDomain: window.location.hostname,
 
                 // Friend state
                 friendName: '',
@@ -1008,7 +913,7 @@
                 },
 
                 copyUrl(token) {
-                    navigator.clipboard.writeText(`https://blaha.io/f/${token}`);
+                    navigator.clipboard.writeText(`https://${this.baseDomain}/f/${token}`);
                     this.showToast('Link copied!');
                 },
 
@@ -1097,7 +1002,7 @@
 
                 getDirectServiceUrl(service) {
                     if (service?.subdomain) {
-                        return `https://${service.subdomain}.blaha.io`;
+                        return `https://${service.subdomain}.${this.baseDomain}`;
                     }
                     return service?.url || '#';
                 },
@@ -1453,6 +1358,30 @@
                         'priorities': 'Priorities'
                     };
                     return labels[stack] || stack.charAt(0).toUpperCase() + stack.slice(1);
+                },
+
+                // Check if a service has managed integration (auto-account creation)
+                isManagedService(service) {
+                    const managedServices = ['plex', 'ombi', 'jellyfin', 'nextcloud', 'overseerr', 'mattermost', 'chat'];
+                    return managedServices.includes(service.name.toLowerCase());
+                },
+
+                // Load integration status for all managed services
+                async loadIntegrationStatus() {
+                    try {
+                        const resp = await fetch('/api/services/integrations-summary');
+                        if (resp.ok) {
+                            this.integrationStatus = await resp.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load integration status:', e);
+                    }
+                },
+
+                // Start editing a service (placeholder - could open modal)
+                startEditService(service) {
+                    // For now, just use the existing inline edit for name
+                    this.startEditName(service);
                 }
             }
         }
