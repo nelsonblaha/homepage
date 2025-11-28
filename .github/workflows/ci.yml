@@ -3,14 +3,13 @@ name: CI
 on:
   push:
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
+  # NOTE: pull_request trigger removed for security
+  # Self-hosted runners should not run untrusted code from forks
+  # See: https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#hardening-for-self-hosted-runners
 
 env:
   # Unique project name per run to avoid conflicts
   CI_PROJECT: homepage-ci-${{ github.run_id }}
-  # Production deploy path (customize for your server)
-  DEPLOY_PATH: /home/ben/docker/blaha-homepage
 
 jobs:
   # Fast Python unit tests (pytest)
@@ -249,22 +248,11 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deploy to production
         run: |
-          cd $DEPLOY_PATH
-
-          # Mark directory as safe (runner user differs from owner)
-          git config --global --add safe.directory $DEPLOY_PATH
-
-          # Pull latest code using HTTPS with GitHub token (SSH not available in container)
-          git remote set-url origin https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
-          git fetch origin main
-          git reset --hard origin/main
-
-          # Restore SSH remote URL for local use
-          git remote set-url origin git@github.com:${{ github.repository }}.git
-
-          # Rebuild and restart containers
+          # Deploy using the checked-out code
           docker compose down
           docker compose up -d --build
           echo "Deploy complete!"
