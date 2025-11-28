@@ -103,23 +103,26 @@ jobs:
         if: always()
         run: pkill -f "uvicorn main:app" || true
 
-  # Integration tests with real containers (Ombi, etc.)
+  # Integration tests with real containers (Ombi + Jellyfin)
   integration-tests:
     runs-on: self-hosted
     # No needs - runs in parallel with pytest and cypress-unit
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set dynamic port
+      - name: Set dynamic ports
         id: ports
         run: |
-          # Unique port based on run_id to avoid conflicts (3580-4579)
+          # Unique ports based on run_id to avoid conflicts
           OMBI_PORT=$(((${{ github.run_id }} % 1000) + 3580))
+          JELLYFIN_PORT=$(((${{ github.run_id }} % 1000) + 8196))
           echo "OMBI_PORT=$OMBI_PORT" >> $GITHUB_ENV
+          echo "JELLYFIN_PORT=$JELLYFIN_PORT" >> $GITHUB_ENV
           echo "ombi_port=$OMBI_PORT" >> $GITHUB_OUTPUT
-          echo "Using OMBI_PORT=$OMBI_PORT"
+          echo "jellyfin_port=$JELLYFIN_PORT" >> $GITHUB_OUTPUT
+          echo "Using OMBI_PORT=$OMBI_PORT, JELLYFIN_PORT=$JELLYFIN_PORT"
 
       - name: Install Cypress dependencies
         run: |
@@ -151,30 +154,27 @@ jobs:
         run: |
           docker compose -p $CI_PROJECT -f docker-compose.ci.yml down -v --remove-orphans 2>/dev/null || true
 
-      - name: Start test containers
+      - name: Start test containers (Ombi + Jellyfin)
         env:
           CI_RUN_ID: ${{ github.run_id }}
           OMBI_PORT: ${{ env.OMBI_PORT }}
+          JELLYFIN_PORT: ${{ env.JELLYFIN_PORT }}
         run: |
-          echo "Starting Ombi on port $OMBI_PORT..."
-          docker compose -p $CI_PROJECT -f docker-compose.ci.yml up -d ombi
-          echo "Waiting for Ombi to become healthy..."
+          echo "Starting Ombi and Jellyfin..."
+          docker compose -p $CI_PROJECT -f docker-compose.ci.yml up -d ombi jellyfin
+          echo "Waiting for services to become healthy..."
 
       - name: Wait for Ombi API
         env:
           CI_RUN_ID: ${{ github.run_id }}
         run: |
-          # Use container name on shared network for runner-to-container communication
           OMBI_CONTAINER="ombi-ci-$CI_RUN_ID"
-          OMBI_PORT=3579  # Internal port, accessed via shared network
+          OMBI_PORT=3579
 
           echo "Waiting for Ombi container $OMBI_CONTAINER to be ready..."
-
-          # First verify container is running
           docker ps | grep "$OMBI_CONTAINER" || echo "WARNING: Container $OMBI_CONTAINER not found!"
 
           for i in $(seq 1 60); do
-            # Access Ombi via container name on shared network (internal port 3579)
             if curl -s --max-time 5 "http://$OMBI_CONTAINER:$OMBI_PORT/api/v1/Status" | grep -q "200"; then
               echo "Ombi API is ready after $i attempts"
               echo "OMBI_CONTAINER=$OMBI_CONTAINER" >> $GITHUB_ENV
@@ -187,18 +187,50 @@ jobs:
           docker compose -p $CI_PROJECT -f docker-compose.ci.yml logs ombi
           exit 1
 
+      - name: Wait for Jellyfin API
+        env:
+          CI_RUN_ID: ${{ github.run_id }}
+        run: |
+          JELLYFIN_CONTAINER="jellyfin-ci-$CI_RUN_ID"
+          JELLYFIN_PORT=8096
+
+          echo "Waiting for Jellyfin container $JELLYFIN_CONTAINER to be ready..."
+          docker ps | grep "$JELLYFIN_CONTAINER" || echo "WARNING: Container $JELLYFIN_CONTAINER not found!"
+
+          for i in $(seq 1 60); do
+            if curl -s --max-time 5 "http://$JELLYFIN_CONTAINER:$JELLYFIN_PORT/health" | grep -qi "healthy"; then
+              echo "Jellyfin API is ready after $i attempts"
+              echo "JELLYFIN_CONTAINER=$JELLYFIN_CONTAINER" >> $GITHUB_ENV
+              exit 0
+            fi
+            echo "Attempt $i/60 - Jellyfin API not ready yet..."
+            sleep 2
+          done
+          echo "ERROR: Jellyfin API failed to start after 2 minutes"
+          docker compose -p $CI_PROJECT -f docker-compose.ci.yml logs jellyfin
+          exit 1
+
       - name: Setup Ombi for CI
         id: ombi-setup
         env:
           OMBI_URL: http://${{ env.OMBI_CONTAINER }}:3579
         run: |
-          chmod +x scripts/setup-ombi-ci.py
           python scripts/setup-ombi-ci.py
           if [ -f /tmp/ombi-api-key.txt ]; then
             echo "OMBI_API_KEY=$(cat /tmp/ombi-api-key.txt)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Start blaha-homepage with Ombi config
+      - name: Setup Jellyfin for CI
+        id: jellyfin-setup
+        env:
+          JELLYFIN_URL: http://${{ env.JELLYFIN_CONTAINER }}:8096
+        run: |
+          python scripts/setup-jellyfin-ci.py
+          if [ -f /tmp/jellyfin-api-key.txt ]; then
+            echo "JELLYFIN_API_KEY=$(cat /tmp/jellyfin-api-key.txt)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Start blaha-homepage with integration configs
         env:
           ADMIN_PASSWORD: testpassword
           SESSION_SECRET: testsecret1234567890abcdef
@@ -207,6 +239,8 @@ jobs:
           COOKIE_DOMAIN: ""
           OMBI_URL: http://${{ env.OMBI_CONTAINER }}:3579
           OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
+          JELLYFIN_URL: http://${{ env.JELLYFIN_CONTAINER }}:8096
+          JELLYFIN_API_KEY: ${{ steps.jellyfin-setup.outputs.JELLYFIN_API_KEY }}
         run: |
           pip install -r requirements.txt
           cd app
@@ -230,6 +264,14 @@ jobs:
           CYPRESS_OMBI_URL: http://${{ env.OMBI_CONTAINER }}:3579
           CYPRESS_OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
 
+      - name: Run Jellyfin integration tests
+        run: npx cypress run --spec "cypress/e2e/integration/jellyfin.cy.js"
+        env:
+          CYPRESS_BASE_URL: http://localhost:8100
+          CYPRESS_ADMIN_PASSWORD: testpassword
+          CYPRESS_JELLYFIN_URL: http://${{ env.JELLYFIN_CONTAINER }}:8096
+          CYPRESS_JELLYFIN_API_KEY: ${{ steps.jellyfin-setup.outputs.JELLYFIN_API_KEY }}
+
       - name: Cleanup
         if: always()
         env:
@@ -239,6 +281,7 @@ jobs:
           docker network rm blaha-ci-isolated-${{ github.run_id }} 2>/dev/null || true
           # Clean up CI-specific volumes
           docker volume rm ombi-ci-config-${{ github.run_id }} 2>/dev/null || true
+          docker volume rm jellyfin-ci-config-${{ github.run_id }} 2>/dev/null || true
           pkill -f "uvicorn main:app" || true
           rm -f /tmp/test-integration-${{ github.run_id }}.db /tmp/test-unit-${{ github.run_id }}.db
 
