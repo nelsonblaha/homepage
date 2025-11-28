@@ -171,6 +171,46 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # =====================================================================
+        # FRIEND AUTHENTICATION MIGRATIONS
+        # =====================================================================
+
+        # Migration: Add password_hash for optional password authentication
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN password_hash TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
+        # Migration: Add totp_secret for optional 2FA
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN totp_secret TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
+        # Migration: Add usage_count to track token usage
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN usage_count INTEGER DEFAULT 0")
+        except:
+            pass  # Column already exists
+
+        # Migration: Add password_required flag (0=no, 1=yes, 2=after_threshold)
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN password_required INTEGER DEFAULT 0")
+        except:
+            pass  # Column already exists
+
+        # Migration: Add password_required_after threshold (usage count)
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN password_required_after INTEGER DEFAULT 10")
+        except:
+            pass  # Column already exists
+
+        # Migration: Add expires_at for time-limited access
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN expires_at TIMESTAMP DEFAULT NULL")
+        except:
+            pass  # Column already exists
+
         await db.commit()
 
 
