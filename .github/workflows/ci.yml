@@ -39,7 +39,7 @@ jobs:
   # Cypress E2E tests without external dependencies
   cypress-unit:
     runs-on: self-hosted
-    needs: pytest
+    # No needs - runs in parallel with pytest
     timeout-minutes: 10
 
     steps:
@@ -105,7 +105,7 @@ jobs:
   # Integration tests with real containers (Ombi, etc.)
   integration-tests:
     runs-on: self-hosted
-    needs: cypress-unit
+    # No needs - runs in parallel with pytest and cypress-unit
     timeout-minutes: 15
 
     steps:
