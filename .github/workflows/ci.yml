@@ -150,10 +150,12 @@ jobs:
 
       - name: Wait for Ombi API
         run: |
-          echo "Waiting for Ombi API to be ready..."
+          # Use Docker bridge gateway IP to reach host services from containerized runner
+          OMBI_HOST="${DOCKER_HOST_IP:-172.17.0.1}"
+          echo "Waiting for Ombi API to be ready at $OMBI_HOST:3580..."
           for i in $(seq 1 120); do
             # Use /api/v1/Status - it's public and returns 200 when ready
-            if curl -s "http://localhost:3580/api/v1/Status" | grep -q "200"; then
+            if curl -s "http://$OMBI_HOST:3580/api/v1/Status" | grep -q "200"; then
               echo "Ombi API is ready after $i attempts"
               exit 0
             fi
@@ -167,7 +169,7 @@ jobs:
       - name: Setup Ombi for CI
         id: ombi-setup
         env:
-          OMBI_URL: http://localhost:3580
+          OMBI_URL: http://172.17.0.1:3580
         run: |
           chmod +x scripts/setup-ombi-ci.py
           python scripts/setup-ombi-ci.py
@@ -182,7 +184,7 @@ jobs:
           DB_PATH: /tmp/test-integration-${{ github.run_id }}.db
           BASE_DOMAIN: localhost
           COOKIE_DOMAIN: ""
-          OMBI_URL: http://localhost:3580
+          OMBI_URL: http://172.17.0.1:3580
           OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
         run: |
           pip install -r requirements.txt
@@ -204,7 +206,7 @@ jobs:
         env:
           CYPRESS_BASE_URL: http://localhost:8100
           CYPRESS_ADMIN_PASSWORD: testpassword
-          CYPRESS_OMBI_URL: http://localhost:3580
+          CYPRESS_OMBI_URL: http://172.17.0.1:3580
           CYPRESS_OMBI_API_KEY: ${{ steps.ombi-setup.outputs.OMBI_API_KEY }}
 
       - name: Cleanup
