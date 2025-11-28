@@ -262,7 +262,7 @@ integration-tests:
   needs: e2e-tests
   steps:
     - name: Start test containers
-      run: docker compose -p blaha-ci-${{ github.run_id }} -f docker-compose.ci.yml up -d
+      run: docker compose -p homepage-ci-${{ github.run_id }} -f docker-compose.ci.yml up -d
 
     - name: Wait for services
       run: |
@@ -277,7 +277,7 @@ integration-tests:
 
     - name: Cleanup
       if: always()
-      run: docker compose -p blaha-ci-${{ github.run_id }} -f docker-compose.ci.yml down -v
+      run: docker compose -p homepage-ci-${{ github.run_id }} -f docker-compose.ci.yml down -v
 ```
 
 ## Test Isolation
@@ -295,14 +295,14 @@ DB_PATH: /tmp/test-${{ github.run_id }}.db
 CI containers use unique project names and networks:
 
 ```yaml
-CI_PROJECT: blaha-ci-${{ github.run_id }}
+CI_PROJECT: homepage-ci-${{ github.run_id }}
 ```
 
 ```yaml
 # docker-compose.ci.yml
 networks:
   ci-network:
-    name: blaha-ci-isolated-${CI_RUN_ID:-local}
+    name: homepage-ci-isolated-${CI_RUN_ID:-local}
 ```
 
 ### Port Mapping

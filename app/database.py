@@ -5,7 +5,7 @@ from pathlib import Path
 
 def get_db_path() -> Path:
     """Get database path from environment (allows test override)."""
-    return Path(os.environ.get("DB_PATH", "/app/data/blaha.db"))
+    return Path(os.environ.get("DB_PATH", "/app/data/homepage.db"))
 
 
 async def init_db():
