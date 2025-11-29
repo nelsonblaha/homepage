@@ -22,6 +22,7 @@ from integrations.ombi import delete_ombi_user
 from integrations.jellyfin import delete_jellyfin_user
 from integrations.nextcloud import delete_nextcloud_user
 from integrations.overseerr import delete_overseerr_user
+from integrations.jellyseerr import jellyseerr_integration
 from integrations.mattermost import delete_mattermost_user
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
@@ -195,7 +196,7 @@ async def delete_friend(friend_id: int, delete_accounts: bool = True, _: bool = 
 
         if delete_accounts:
             cursor = await db.execute(
-                "SELECT plex_user_id, ombi_user_id, jellyfin_user_id, nextcloud_user_id, overseerr_user_id, mattermost_user_id FROM friends WHERE id = ?",
+                "SELECT plex_user_id, ombi_user_id, jellyfin_user_id, nextcloud_user_id, overseerr_user_id, jellyseerr_user_id, mattermost_user_id FROM friends WHERE id = ?",
                 (friend_id,)
             )
             friend = await cursor.fetchone()
@@ -210,6 +211,8 @@ async def delete_friend(friend_id: int, delete_accounts: bool = True, _: bool = 
                     await delete_nextcloud_user(friend["nextcloud_user_id"])
                 if friend.get("overseerr_user_id"):
                     await delete_overseerr_user(friend["overseerr_user_id"])
+                if friend.get("jellyseerr_user_id"):
+                    await jellyseerr_integration.delete_user(friend["jellyseerr_user_id"])
                 if friend.get("mattermost_user_id"):
                     await delete_mattermost_user(friend["mattermost_user_id"])
 
@@ -455,6 +458,7 @@ async def get_friend_credentials(token: str, service_key: str):
             "ombi": ("ombi_user_id", "ombi_password"),
             "jellyfin": ("jellyfin_user_id", "jellyfin_password"),
             "overseerr": ("overseerr_user_id", "overseerr_password"),
+            "jellyseerr": ("jellyseerr_user_id", "jellyseerr_password"),
             "mattermost": ("mattermost_user_id", "mattermost_password"),
             "chat": ("mattermost_user_id", "mattermost_password"),  # alias for subdomain
         }

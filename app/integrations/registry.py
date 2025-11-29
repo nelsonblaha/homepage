@@ -81,6 +81,12 @@ def _init_registry():
     except ImportError:
         pass
 
+    try:
+        from integrations.jellyseerr import jellyseerr_integration
+        _INTEGRATIONS["jellyseerr"] = jellyseerr_integration
+    except ImportError:
+        pass
+
     _REGISTRY_INITIALIZED = True
 
 
@@ -122,6 +128,7 @@ SERVICE_DB_COLUMNS = {
     "jellyfin": ("jellyfin_user_id", "jellyfin_password"),
     "nextcloud": ("nextcloud_user_id", "nextcloud_password"),
     "overseerr": ("overseerr_user_id", "overseerr_password"),
+    "jellyseerr": ("jellyseerr_user_id", "jellyseerr_password"),
     "mattermost": ("mattermost_user_id", "mattermost_password"),
     "chat": ("mattermost_user_id", "mattermost_password"),  # Alias
 }

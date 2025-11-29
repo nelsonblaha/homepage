@@ -218,6 +218,16 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # Migration: Add jellyseerr columns to friends
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN jellyseerr_user_id TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+        try:
+            await db.execute("ALTER TABLE friends ADD COLUMN jellyseerr_password TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
         # =====================================================================
         # FRIEND AUTHENTICATION MIGRATIONS
         # =====================================================================

@@ -142,6 +142,26 @@ SERVICES = {
         test_file="cypress/e2e/integration/overseerr.cy.js",
     ),
 
+    "jellyseerr": ServiceCapabilities(
+        name="Jellyseerr",
+        slug="jellyseerr",
+        icon="fa-ticket-alt",
+        auth_strategy=AuthStrategy.COOKIE_PROXY,
+        user_management=UserManagement.FULL_API,
+        auto_login=True,
+        requires_auth_setup_proxy=False,
+        cookie_name="connect.sid",
+        can_create_users=True,
+        can_delete_users=True,
+        can_set_permissions=True,
+        generates_password=True,
+        has_status_check=True,
+        env_prefix="JELLYSEERR",
+        ci_container_image="fallenbagel/jellyseerr:latest",
+        ci_port=5155,
+        test_file="cypress/e2e/integration/jellyseerr.cy.js",
+    ),
+
     "mattermost": ServiceCapabilities(
         name="Mattermost",
         slug="mattermost",
