@@ -11,7 +11,7 @@ class ServiceBase(BaseModel):
     subdomain: str = ""  # For SSO: e.g., "ombi" for ombi.yourdomain.com
     stack: str = ""  # Docker stack: media, infra, jitsi, priorities, etc.
     is_default: bool = False  # Auto-grant to new friends
-    auth_type: str = "none"  # none, basic, jellyfin, ombi
+    auth_type: str = "none"  # none, basic, forward-auth, jellyfin, ombi, overseerr, plex, nextcloud, mattermost, open
     github_repo: str = ""  # GitHub repo for CI status (e.g., "nelsonblaha/homepage")
     quick_join_params: str = ""  # JSON params for quick-join URLs, e.g. {"session": "blaha.io"}
     visible_to_friends: bool = True  # Whether this service appears in friend assignment UI

@@ -615,6 +615,11 @@
                                                    :title="`CI: ${ciStatus[service.id]?.conclusion || ciStatus[service.id]?.status || 'unknown'}`">
                                                     CI <span x-text="getCIBadgeText(service.id)"></span>
                                                 </a>
+                                                <!-- Auth status indicator -->
+                                                <span x-show="getAuthStatusInfo(service)"
+                                                      :title="getAuthStatusInfo(service)?.title"
+                                                      class="text-sm"
+                                                      x-text="getAuthStatusInfo(service)?.icons"></span>
                                             </div>
                                             <div class="flex items-center gap-3 text-sm text-gray-400">
                                                 <span x-text="service.subdomain ? service.subdomain + '.' : ''"></span>
@@ -1433,9 +1438,14 @@
                     // Returns {icon, color, title} or null based on service status
                     const healthStatus = this.serviceStatuses[service.id] || {};
 
-                    // Service down = red X
+                    // Service down = red X (applies to both admin and friend views)
                     if (healthStatus.health === 'down') {
                         return { icon: '❌', color: 'red-400', title: 'service down' };
+                    }
+
+                    // Admin view - gear icon (admin uses their own credentials everywhere)
+                    if (this.view === 'admin') {
+                        return { icon: '⚙️', color: 'blue-400', title: 'admin access' };
                     }
 
                     // Check if account is being provisioned (for friend view)
@@ -1458,14 +1468,14 @@
                         return { icon: '✏️', color: 'yellow-400', title: 'manual login required' };
                     }
 
-                    // Ready: auto-login, open service, or health check passed
+                    // Ready: auto-login, open service, or health check passed - arrow means "click to go right in"
                     if (this.isAutoAuth(service) || healthStatus.health === 'up') {
-                        return { icon: '✅', color: 'green-400', title: 'ready' };
+                        return { icon: '↗️', color: 'green-400', title: 'click to enter' };
                     }
 
-                    // External account (like Plex) - uses lock icon
+                    // External account (like Plex) - key means "use your own account"
                     if (this.hasKnownAuthType(service)) {
-                        return { icon: '🔒', color: 'gray-400', title: 'external account needed' };
+                        return { icon: '🔑', color: 'gray-400', title: 'use your own account' };
                     }
 
                     return null; // Unknown/no icon
@@ -1871,6 +1881,54 @@
                 isManagedService(service) {
                     const managedServices = ['plex', 'ombi', 'jellyfin', 'nextcloud', 'overseerr', 'mattermost', 'chat'];
                     return managedServices.includes(service.name.toLowerCase());
+                },
+
+                // Check if service can auto-create accounts (not just managed, but actually creates accounts)
+                canAutoCreateAccount(service) {
+                    // Plex is "managed" but doesn't auto-create - user invites themselves via Plex
+                    const autoCreateServices = ['ombi', 'jellyfin', 'nextcloud', 'overseerr', 'mattermost', 'chat'];
+                    return autoCreateServices.includes(service.name.toLowerCase());
+                },
+
+                // Get auth status info for admin view - shows capabilities for new users
+                // Returns { icons: string, title: string } or null
+                getAuthStatusInfo(service) {
+                    const healthStatus = this.serviceStatuses[service.id] || {};
+                    const isDown = healthStatus.health === 'down';
+                    const canCreate = this.canAutoCreateAccount(service);
+                    const isManualLogin = this.needsManualLogin(service);
+                    const isAuto = this.isAutoAuth(service);
+
+                    // Build the status
+                    let icons = '';
+                    let parts = [];
+
+                    // Person emoji if we can create accounts
+                    if (canCreate) {
+                        icons += '👤';
+                        parts.push('auto-creates account');
+                    }
+
+                    // Then show login method
+                    if (isDown) {
+                        icons += '❌';
+                        parts.push('service down');
+                    } else if (isManualLogin) {
+                        icons += '✏️';
+                        parts.push('manual login');
+                    } else if (isAuto) {
+                        icons += '↗️';
+                        parts.push('auto-login');
+                    } else if (service.auth_type === 'plex') {
+                        icons += '🔑';
+                        parts.push('external Plex account');
+                    } else if (service.auth_type === 'none' || !service.auth_type) {
+                        // No integration - admin uses own credentials
+                        icons += '🔑';
+                        parts.push('own credentials');
+                    }
+
+                    return icons ? { icons, title: parts.join(', ') } : null;
                 },
 
                 // Load integration status for all managed services

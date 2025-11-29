@@ -219,6 +219,11 @@ async def admin_page():
     return FileResponse("static/index.html")
 
 
+@app.get("/admin/{path:path}")
+async def admin_subpage(path: str):
+    return FileResponse("static/index.html")
+
+
 @app.get("/request-access")
 async def request_access_page():
     return FileResponse("static/index.html")
