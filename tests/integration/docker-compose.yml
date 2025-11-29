@@ -1,0 +1,158 @@
+version: "3.8"
+
+# Integration test services - spin up real containers for testing
+# Run with: docker compose -f tests/integration/docker-compose.yml up -d
+#
+# ISOLATION for running alongside production:
+# - Separate network (homepage-test-network)
+# - Unique container names (homepage-test-*)
+# - High ports in 19xxx range bound to localhost only
+# - Isolated volumes (homepage-test-*)
+
+networks:
+  homepage-test:
+    name: homepage-test-network
+    driver: bridge
+
+services:
+  # Jellyfin - Media server
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: homepage-test-jellyfin
+    networks:
+      - homepage-test
+    environment:
+      - JELLYFIN_PublishedServerUrl=http://localhost:19096
+    ports:
+      - "127.0.0.1:19096:8096"
+    volumes:
+      - homepage-test-jellyfin-config:/config
+      - homepage-test-jellyfin-cache:/cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Ombi - Media request management
+  ombi:
+    image: lscr.io/linuxserver/ombi:latest
+    container_name: homepage-test-ombi
+    networks:
+      - homepage-test
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    ports:
+      - "127.0.0.1:19579:3579"
+    volumes:
+      - homepage-test-ombi-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3579/api/v1/Status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # Overseerr - Media request management
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: homepage-test-overseerr
+    networks:
+      - homepage-test
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    ports:
+      - "127.0.0.1:19055:5055"
+    volumes:
+      - homepage-test-overseerr-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # Nextcloud - File storage
+  nextcloud:
+    image: nextcloud:latest
+    container_name: homepage-test-nextcloud
+    networks:
+      - homepage-test
+    environment:
+      - NEXTCLOUD_ADMIN_USER=admin
+      - NEXTCLOUD_ADMIN_PASSWORD=adminpass123
+      - SQLITE_DATABASE=nextcloud
+    ports:
+      - "127.0.0.1:19080:80"
+    volumes:
+      - homepage-test-nextcloud-data:/var/www/html
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/status.php"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
+  # Mattermost - Team chat
+  mattermost:
+    image: mattermost/mattermost-team-edition:latest
+    container_name: homepage-test-mattermost
+    networks:
+      - homepage-test
+    environment:
+      - TZ=UTC
+      - MM_SQLSETTINGS_DRIVERNAME=postgres
+      - MM_SQLSETTINGS_DATASOURCE=postgres://mattermost:mattermost@homepage-test-postgres:5432/mattermost?sslmode=disable
+      - MM_SERVICESETTINGS_SITEURL=http://localhost:19065
+      - MM_SERVICESETTINGS_ENABLELOCALMODE=true
+    ports:
+      - "127.0.0.1:19065:8065"
+    volumes:
+      - homepage-test-mattermost-data:/mattermost/data
+      - homepage-test-mattermost-logs:/mattermost/logs
+      - homepage-test-mattermost-config:/mattermost/config
+      - homepage-test-mattermost-plugins:/mattermost/plugins
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8065/api/v4/system/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # PostgreSQL for Mattermost
+  postgres:
+    image: postgres:15-alpine
+    container_name: homepage-test-postgres
+    networks:
+      - homepage-test
+    environment:
+      - POSTGRES_USER=mattermost
+      - POSTGRES_PASSWORD=mattermost
+      - POSTGRES_DB=mattermost
+    volumes:
+      - homepage-test-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "mattermost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  homepage-test-jellyfin-config:
+  homepage-test-jellyfin-cache:
+  homepage-test-ombi-config:
+  homepage-test-overseerr-config:
+  homepage-test-nextcloud-data:
+  homepage-test-mattermost-data:
+  homepage-test-mattermost-logs:
+  homepage-test-mattermost-config:
+  homepage-test-mattermost-plugins:
+  homepage-test-postgres-data:
