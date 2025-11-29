@@ -305,7 +305,7 @@ class TestForwardAuth:
         response = client.get("/api/auth/verify")
         assert response.status_code == 200
         assert "X-Remote-User" in response.headers
-        assert response.headers["X-Remote-User"] == "admin"
+        assert response.headers["X-Remote-User"] == "Ben"  # Default ADMIN_NAME
 
 
 # =============================================================================
