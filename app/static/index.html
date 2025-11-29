@@ -92,13 +92,13 @@
                             <template x-for="service in group.services" :key="service.id">
                                 <div @click="handleServiceClick(service)"
                                      class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative cursor-pointer">
-                                    <!-- Auth indicator (only show for known auth types) -->
-                                    <span x-show="isAutoAuth(service)"
-                                          class="absolute top-2 right-2 text-green-400 text-sm" title="auto-login">↗</span>
-                                    <span x-show="needsManualLogin(service)"
-                                          class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
-                                    <span x-show="hasKnownAuthType(service) && !isAutoAuth(service) && !needsManualLogin(service)"
-                                          class="absolute top-2 right-2 text-gray-400 text-sm" title="external account needed">🔒</span>
+                                    <!-- Status indicator icon -->
+                                    <template x-if="getServiceIcon(service)">
+                                        <span class="absolute top-2 right-2 text-sm"
+                                              :class="'text-' + getServiceIcon(service).color"
+                                              :title="getServiceIcon(service).title"
+                                              x-text="getServiceIcon(service).icon"></span>
+                                    </template>
                                     <!-- Jitsi participant badge (for Video Chat service) -->
                                     <span x-show="service.name.toLowerCase().includes('video') && jitsiParticipants > 0"
                                           class="absolute top-2 left-2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
@@ -277,13 +277,13 @@
                                 <a :href="service.url"
                                    target="_blank"
                                    class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative">
-                                    <!-- Auth indicator (only show for known auth types) -->
-                                    <span x-show="isAutoAuth(service)"
-                                          class="absolute top-2 right-2 text-green-400 text-sm" title="auto-login">↗</span>
-                                    <span x-show="needsManualLogin(service)"
-                                          class="absolute top-2 right-2 text-yellow-400 text-sm" title="manual login required">✏️</span>
-                                    <span x-show="hasKnownAuthType(service) && !isAutoAuth(service) && !needsManualLogin(service)"
-                                          class="absolute top-2 right-2 text-gray-400 text-sm" title="external account needed">🔒</span>
+                                    <!-- Status indicator icon -->
+                                    <template x-if="getServiceIcon(service)">
+                                        <span class="absolute top-2 right-2 text-sm"
+                                              :class="'text-' + getServiceIcon(service).color"
+                                              :title="getServiceIcon(service).title"
+                                              x-text="getServiceIcon(service).icon"></span>
+                                    </template>
                                     <!-- Jitsi participant badge (for Video Chat service) -->
                                     <span x-show="service.name.toLowerCase().includes('video') && jitsiParticipants > 0"
                                           class="absolute top-2 left-2 bg-green-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
@@ -830,6 +830,12 @@
                 creatingAccount: {},  // Track loading state for account creation
                 toast: { show: false, message: '' },
 
+                // WebSocket state
+                ws: null,
+                wsReconnectTimer: null,
+                serviceStatuses: {},  // {service_id: {health: 'up'|'down'|'auth_required'}}
+                provisioningStatuses: {},  // {friend_id:service: {status: 'provisioning'|'ready'|'failed'}}
+
                 // Activity tracking
                 activityStats: {},
                 activityLog: [],
@@ -892,11 +898,10 @@
                         }
                     }
 
-                    // Start Jitsi participant polling (every 5 seconds for live updates)
-                    this.fetchJitsiParticipants();
-                    setInterval(() => this.fetchJitsiParticipants(), 5000);
+                    // Connect WebSocket for real-time updates
+                    this.connectWebSocket();
 
-                    // Start CI status polling (every 60 seconds)
+                    // Fallback polling for CI status (every 60 seconds) - WebSocket doesn't handle this yet
                     setInterval(() => {
                         if (this.view === 'admin' || this.view === 'admin-services') {
                             this.loadCIStatus();
@@ -945,6 +950,72 @@
                         }
                     } catch (e) {
                         console.error('Failed to fetch Jitsi participants:', e);
+                    }
+                },
+
+                connectWebSocket() {
+                    if (this.ws) {
+                        this.ws.close();
+                    }
+                    if (this.wsReconnectTimer) {
+                        clearTimeout(this.wsReconnectTimer);
+                        this.wsReconnectTimer = null;
+                    }
+
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const wsUrl = `${protocol}//${window.location.host}/ws${this.friendToken ? '?token=' + this.friendToken : ''}`;
+
+                    this.ws = new WebSocket(wsUrl);
+
+                    this.ws.onopen = () => {
+                        console.log('WebSocket connected');
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const msg = JSON.parse(event.data);
+                            this.handleWebSocketMessage(msg);
+                        } catch (e) {
+                            console.error('Failed to parse WebSocket message:', e);
+                        }
+                    };
+
+                    this.ws.onclose = (event) => {
+                        console.log('WebSocket closed, reconnecting in 5s...');
+                        this.wsReconnectTimer = setTimeout(() => this.connectWebSocket(), 5000);
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                    };
+                },
+
+                handleWebSocketMessage(msg) {
+                    switch (msg.type) {
+                        case 'service_status':
+                            this.serviceStatuses[msg.service_id] = { health: msg.health };
+                            break;
+                        case 'account_status':
+                            const key = `${msg.friend_id}:${msg.service}`;
+                            if (msg.status === 'ready' || msg.status === 'failed') {
+                                delete this.provisioningStatuses[key];
+                            } else {
+                                this.provisioningStatuses[key] = { status: msg.status };
+                            }
+                            break;
+                        case 'jitsi_update':
+                            this.jitsiParticipants = msg.participants;
+                            break;
+                        case 'activity':
+                            // Prepend new activity to the log
+                            if (this.activityLog) {
+                                this.activityLog.unshift(msg.entry);
+                                // Keep only last 50
+                                if (this.activityLog.length > 50) {
+                                    this.activityLog.pop();
+                                }
+                            }
+                            break;
                     }
                 },
 
@@ -1354,6 +1425,42 @@
                     const authType = service.auth_type || '';
                     const knownTypes = ['jellyfin', 'ombi', 'overseerr', 'forward-auth', 'open', 'nextcloud', 'mattermost', 'basic', 'plex'];
                     return knownTypes.includes(authType);
+                },
+
+                getServiceIcon(service) {
+                    // Returns {icon, color, title} or null based on service status
+                    const status = this.serviceStatuses[service.id] || {};
+
+                    // Service down = red X
+                    if (status.health === 'down') {
+                        return { icon: '❌', color: 'red-400', title: 'service down' };
+                    }
+
+                    // Check if account is being provisioned (for friend view)
+                    // Note: This requires friendId which we'd need to pass or look up
+                    // For now, we'll handle this via the friend's service list
+
+                    // Has basic auth we can't bypass = pencil (credentials in modal)
+                    if (status.health === 'auth_required' && this.needsManualLogin(service)) {
+                        return { icon: '✏️', color: 'yellow-400', title: 'credentials in modal' };
+                    }
+
+                    // Manual login without health check info
+                    if (this.needsManualLogin(service)) {
+                        return { icon: '✏️', color: 'yellow-400', title: 'manual login required' };
+                    }
+
+                    // Ready: auto-login, open service, or health check passed
+                    if (this.isAutoAuth(service) || status.health === 'up') {
+                        return { icon: '✅', color: 'green-400', title: 'ready' };
+                    }
+
+                    // External account (like Plex) - uses lock icon
+                    if (this.hasKnownAuthType(service)) {
+                        return { icon: '🔒', color: 'gray-400', title: 'external account needed' };
+                    }
+
+                    return null; // Unknown/no icon
                 },
 
                 async handleServiceClick(service) {
