@@ -95,15 +95,16 @@ async def test_start_background_tasks():
 
     with patch("services.background.health_check_loop", new_callable=AsyncMock) as mock_health:
         with patch("services.background.jitsi_check_loop", new_callable=AsyncMock) as mock_jitsi:
-            tasks = await start_background_tasks()
+            with patch("services.background.infra_health_check_loop", new_callable=AsyncMock) as mock_infra:
+                tasks = await start_background_tasks()
 
-            assert len(tasks) == 2
-            assert all(isinstance(t, asyncio.Task) for t in tasks)
+                assert len(tasks) == 3
+                assert all(isinstance(t, asyncio.Task) for t in tasks)
 
-            # Cancel tasks to clean up
-            for task in tasks:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+                # Cancel tasks to clean up
+                for task in tasks:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
