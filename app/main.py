@@ -20,6 +20,7 @@ from integrations.ombi import router as ombi_router
 from integrations.jellyfin import router as jellyfin_router
 from integrations.nextcloud import router as nextcloud_router
 from integrations.overseerr import router as overseerr_router
+from integrations.jellyseerr import router as jellyseerr_router
 from integrations.jitsi import router as jitsi_router
 from integrations.mattermost import router as mattermost_router
 
@@ -57,6 +58,7 @@ app.include_router(ombi_router)
 app.include_router(jellyfin_router)
 app.include_router(nextcloud_router)
 app.include_router(overseerr_router)
+app.include_router(jellyseerr_router)
 app.include_router(jitsi_router)
 app.include_router(mattermost_router)
 
