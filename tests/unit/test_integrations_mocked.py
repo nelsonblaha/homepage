@@ -224,6 +224,35 @@ class TestJellyfinIntegration:
             assert result.connected is True
             assert result.server_name == "My Jellyfin Server"
 
+    @pytest.mark.asyncio
+    async def test_delete_user_success(self, mock_env):
+        """Test successful Jellyfin user deletion."""
+        from integrations.jellyfin import jellyfin_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.delete.return_value = make_mock_response(status_code=204)
+
+            result = await jellyfin_integration.delete_user("user-uuid-123")
+
+            assert result is True
+            mock_ctx.delete.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_user_failure(self, mock_env):
+        """Test Jellyfin user deletion failure."""
+        from integrations.jellyfin import jellyfin_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.delete.return_value = make_mock_response(status_code=404)
+
+            result = await jellyfin_integration.delete_user("nonexistent")
+
+            assert result is False
+
 
 # =============================================================================
 # OVERSEERR INTEGRATION TESTS
@@ -272,6 +301,35 @@ class TestOverseerrIntegration:
 
             assert result.success is True
             assert "connect.sid" in result.cookies
+
+    @pytest.mark.asyncio
+    async def test_delete_user_success(self, mock_env):
+        """Test successful Overseerr user deletion."""
+        from integrations.overseerr import overseerr_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.delete.return_value = make_mock_response(status_code=204)
+
+            result = await overseerr_integration.delete_user("42")
+
+            assert result is True
+            mock_ctx.delete.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_user_failure(self, mock_env):
+        """Test Overseerr user deletion failure."""
+        from integrations.overseerr import overseerr_integration
+
+        with patch('httpx.AsyncClient') as mock_client:
+            mock_ctx = AsyncMock()
+            mock_client.return_value.__aenter__.return_value = mock_ctx
+            mock_ctx.delete.return_value = make_mock_response(status_code=404)
+
+            result = await overseerr_integration.delete_user("nonexistent")
+
+            assert result is False
 
 
 # =============================================================================

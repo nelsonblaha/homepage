@@ -4,7 +4,13 @@ Auto Account Management
 This module handles automatic account creation/deletion when services
 are granted to or revoked from friends. It uses the integration registry
 for most services, with special handling for Plex.
+
+Account creation can run asynchronously in the background, with status
+updates pushed via WebSocket.
 """
+
+import asyncio
+from typing import Optional
 
 from integrations.registry import (
     get_integration,
@@ -14,6 +20,7 @@ from integrations.registry import (
     SERVICE_DB_COLUMNS,
 )
 from integrations.plex import create_plex_user, delete_plex_user
+from database import get_db
 
 
 # =============================================================================
@@ -21,6 +28,114 @@ from integrations.plex import create_plex_user, delete_plex_user
 # =============================================================================
 # Maps service slugs to their user_id column name (for friends.py compatibility)
 MANAGED_SERVICES = {slug: cols[0] for slug, cols in SERVICE_DB_COLUMNS.items()}
+
+
+# =============================================================================
+# ASYNC ACCOUNT PROVISIONING
+# =============================================================================
+
+async def start_provisioning(
+    friend_id: int,
+    friend_name: str,
+    friend_token: str,
+    service_name: str
+) -> dict:
+    """
+    Start async account provisioning for a service.
+
+    Records provisioning status in DB, spawns background task, and broadcasts
+    status via WebSocket.
+
+    Returns immediately with provisioning status.
+    """
+    from websocket import manager as ws_manager
+
+    service_lower = service_name.lower()
+
+    # Record provisioning status
+    async with await get_db() as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO provisioning_status
+            (friend_id, service, status, updated_at)
+            VALUES (?, ?, 'provisioning', CURRENT_TIMESTAMP)
+        """, (friend_id, service_lower))
+        await db.commit()
+
+    # Broadcast provisioning started
+    await ws_manager.update_provisioning_status(
+        friend_id, service_lower, "provisioning", friend_token
+    )
+
+    # Spawn background task
+    asyncio.create_task(
+        _provision_account_background(
+            friend_id, friend_name, friend_token, service_lower
+        )
+    )
+
+    return {"status": "provisioning", "service": service_name}
+
+
+async def _provision_account_background(
+    friend_id: int,
+    friend_name: str,
+    friend_token: str,
+    service_name: str
+):
+    """Background task that actually creates the account."""
+    from websocket import manager as ws_manager
+
+    try:
+        async with await get_db() as db:
+            result = await handle_service_grant(friend_id, friend_name, service_name, db)
+            await db.commit()
+
+        if result.get("success"):
+            status = "ready"
+            error = ""
+        else:
+            status = "failed"
+            error = result.get("error", "Unknown error")
+
+        # Update DB status
+        async with await get_db() as db:
+            await db.execute("""
+                UPDATE provisioning_status
+                SET status = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE friend_id = ? AND service = ?
+            """, (status, error, friend_id, service_name))
+            await db.commit()
+
+        # Broadcast completion
+        await ws_manager.update_provisioning_status(
+            friend_id, service_name, status, friend_token
+        )
+
+    except Exception as e:
+        # Handle unexpected errors
+        async with await get_db() as db:
+            await db.execute("""
+                UPDATE provisioning_status
+                SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE friend_id = ? AND service = ?
+            """, (str(e), friend_id, service_name))
+            await db.commit()
+
+        await ws_manager.update_provisioning_status(
+            friend_id, service_name, "failed", friend_token
+        )
+
+
+async def get_provisioning_status(friend_id: int, service_name: str) -> Optional[dict]:
+    """Get current provisioning status for a friend/service pair."""
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        cursor = await db.execute("""
+            SELECT status, error_message, created_at, updated_at
+            FROM provisioning_status
+            WHERE friend_id = ? AND service = ?
+        """, (friend_id, service_name.lower()))
+        return await cursor.fetchone()
 
 
 async def handle_service_grant(friend_id: int, friend_name: str, service_name: str, db) -> dict:

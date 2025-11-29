@@ -844,6 +844,7 @@
                 baseDomain: window.location.hostname,
 
                 // Friend state
+                friendId: null,
                 friendName: '',
                 friendServices: [],
                 friendError: '',
@@ -1330,6 +1331,7 @@
                         const resp = await fetch(`/api/f/${token}`);
                         if (resp.ok) {
                             const data = await resp.json();
+                            this.friendId = data.id;
                             this.friendName = data.name;
                             this.friendServices = data.services;
                             this.view = 'friend';
@@ -1429,19 +1431,25 @@
 
                 getServiceIcon(service) {
                     // Returns {icon, color, title} or null based on service status
-                    const status = this.serviceStatuses[service.id] || {};
+                    const healthStatus = this.serviceStatuses[service.id] || {};
 
                     // Service down = red X
-                    if (status.health === 'down') {
+                    if (healthStatus.health === 'down') {
                         return { icon: '❌', color: 'red-400', title: 'service down' };
                     }
 
                     // Check if account is being provisioned (for friend view)
-                    // Note: This requires friendId which we'd need to pass or look up
-                    // For now, we'll handle this via the friend's service list
+                    if (this.friendId) {
+                        const serviceKey = service.subdomain || service.name.toLowerCase();
+                        const provKey = `${this.friendId}:${serviceKey}`;
+                        const provStatus = this.provisioningStatuses[provKey];
+                        if (provStatus && provStatus.status === 'provisioning') {
+                            return { icon: '⏳', color: 'yellow-400', title: 'setting up account...' };
+                        }
+                    }
 
                     // Has basic auth we can't bypass = pencil (credentials in modal)
-                    if (status.health === 'auth_required' && this.needsManualLogin(service)) {
+                    if (healthStatus.health === 'auth_required' && this.needsManualLogin(service)) {
                         return { icon: '✏️', color: 'yellow-400', title: 'credentials in modal' };
                     }
 
@@ -1451,7 +1459,7 @@
                     }
 
                     // Ready: auto-login, open service, or health check passed
-                    if (this.isAutoAuth(service) || status.health === 'up') {
+                    if (this.isAutoAuth(service) || healthStatus.health === 'up') {
                         return { icon: '✅', color: 'green-400', title: 'ready' };
                     }
 

@@ -282,6 +282,7 @@ async def get_friend_view(token: str, authenticated: bool = False):
         services = await cursor.fetchall()
 
         response = {
+            "id": friend["id"],
             "name": friend["name"],
             "services": services,
             "usage_count": new_count,

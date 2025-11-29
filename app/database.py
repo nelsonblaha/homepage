@@ -87,6 +87,21 @@ async def init_db():
             )
         """)
 
+        # Account provisioning status for async account creation
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS provisioning_status (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                friend_id INTEGER NOT NULL,
+                service TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                error_message TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (friend_id) REFERENCES friends(id) ON DELETE CASCADE,
+                UNIQUE(friend_id, service)
+            )
+        """)
+
         # =====================================================================
         # MIGRATIONS FOR services TABLE
         # =====================================================================
