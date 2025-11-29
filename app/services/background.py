@@ -15,6 +15,8 @@ from websocket import manager as ws_manager
 # Health check interval in seconds
 HEALTH_CHECK_INTERVAL = 30
 JITSI_CHECK_INTERVAL = 5
+INFRA_HEALTH_INTERVAL = 30
+HEALTH_DAEMON_URL = "http://172.17.0.1:9876"
 
 
 async def check_service_health(service_id: int, url: str) -> str:
@@ -95,10 +97,26 @@ async def jitsi_check_loop():
         await asyncio.sleep(JITSI_CHECK_INTERVAL)
 
 
+async def infra_health_check_loop():
+    """Periodically fetch infrastructure health from blaha-health-daemon."""
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{HEALTH_DAEMON_URL}/api/health/results")
+                if response.status_code == 200:
+                    data = response.json()
+                    await ws_manager.update_infra_health(data)
+        except Exception as e:
+            print(f"Infra health check error: {e}")
+
+        await asyncio.sleep(INFRA_HEALTH_INTERVAL)
+
+
 async def start_background_tasks() -> List[asyncio.Task]:
     """Start all background tasks and return task handles."""
     tasks = [
         asyncio.create_task(health_check_loop()),
         asyncio.create_task(jitsi_check_loop()),
+        asyncio.create_task(infra_health_check_loop()),
     ]
     return tasks

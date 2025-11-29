@@ -28,6 +28,8 @@ class ConnectionManager:
         self.service_statuses: Dict[int, dict] = {}
         self.provisioning_statuses: Dict[str, dict] = {}  # key: f"{friend_id}:{service}"
         self.jitsi_participants: int = 0
+        # Infrastructure health from blaha-health-daemon
+        self.infra_health: Optional[dict] = None
 
     async def connect(self, websocket: WebSocket, token: Optional[str] = None):
         """Accept a new WebSocket connection."""
@@ -83,6 +85,13 @@ class ConnectionManager:
             "type": "jitsi_update",
             "participants": self.jitsi_participants
         })
+
+        # Infrastructure health (admin only)
+        if token is None and self.infra_health:
+            await self._send_json(websocket, {
+                "type": "infra_health",
+                **self.infra_health
+            })
 
     async def _send_json(self, websocket: WebSocket, data: dict):
         """Send JSON to a single websocket, handling errors."""
@@ -199,6 +208,14 @@ class ConnectionManager:
         await self.broadcast_to_admins({
             "type": "activity",
             "entry": entry
+        })
+
+    async def update_infra_health(self, health_data: dict):
+        """Update and broadcast infrastructure health to admins."""
+        self.infra_health = health_data
+        await self.broadcast_to_admins({
+            "type": "infra_health",
+            **health_data
         })
 
 

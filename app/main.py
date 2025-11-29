@@ -23,6 +23,7 @@ from integrations.overseerr import router as overseerr_router
 from integrations.jellyseerr import router as jellyseerr_router
 from integrations.jitsi import router as jitsi_router
 from integrations.mattermost import router as mattermost_router
+from routes.health import router as health_router
 
 
 @asynccontextmanager
@@ -61,6 +62,7 @@ app.include_router(overseerr_router)
 app.include_router(jellyseerr_router)
 app.include_router(jitsi_router)
 app.include_router(mattermost_router)
+app.include_router(health_router)
 
 
 # =============================================================================
