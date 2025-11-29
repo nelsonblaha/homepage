@@ -231,11 +231,15 @@ async def handle_service_revoke_v2(
     )
     row = await cursor.fetchone()
 
-    if not row or not row.get(user_id_col):
+    # Support both tuple and dict row formats (depends on row_factory setting)
+    if isinstance(row, dict):
+        user_id = row.get(user_id_col)
+    else:
+        user_id = row[0] if row else None
+
+    if not user_id:
         # No user ID stored, nothing to delete
         return result
-
-    user_id = row[user_id_col]
 
     # Delete the user
     if await integration.delete_user(user_id):
