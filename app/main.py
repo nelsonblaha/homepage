@@ -1,10 +1,13 @@
 """Homepage - Friend access portal and service management"""
+import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Response
+from typing import Optional
+from fastapi import FastAPI, Response, WebSocket, WebSocketDisconnect, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from database import init_db, get_db
+from websocket import manager as ws_manager
 
 # Import routers
 from routes.auth import router as auth_router
@@ -24,7 +27,20 @@ from integrations.mattermost import router as mattermost_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+
+    # Start background tasks
+    from services.background import start_background_tasks
+    background_tasks = await start_background_tasks()
+
     yield
+
+    # Cancel background tasks on shutdown
+    for task in background_tasks:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Homepage", lifespan=lifespan)
@@ -153,6 +169,40 @@ async def update_plex_pin(friend_id: int, pin: str, _: bool = Depends(verify_adm
             return {"status": "ok"}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# WEBSOCKET ENDPOINT
+# =============================================================================
+
+@app.websocket("/ws")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: Optional[str] = Query(None)
+):
+    """WebSocket endpoint for real-time updates.
+
+    Connect without token for admin view, or with friend token for friend view.
+    """
+    # Validate friend token if provided
+    if token:
+        async with await get_db() as db:
+            cursor = await db.execute(
+                "SELECT id FROM friends WHERE token = ?", (token,)
+            )
+            friend = await cursor.fetchone()
+            if not friend:
+                await websocket.close(code=4001, reason="Invalid token")
+                return
+
+    await ws_manager.connect(websocket, token)
+    try:
+        while True:
+            # Keep connection alive, handle any client messages
+            data = await websocket.receive_text()
+            # Currently we don't expect client messages, but could add ping/pong
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket, token)
 
 
 # =============================================================================
