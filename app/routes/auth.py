@@ -20,6 +20,7 @@ BASIC_AUTH_USER = os.environ.get("BASIC_AUTH_USER", "")
 BASIC_AUTH_PASS = os.environ.get("BASIC_AUTH_PASS", "")
 COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", "")  # e.g., ".example.com" - leave empty for localhost
 BASE_DOMAIN = os.environ.get("BASE_DOMAIN", "localhost")  # e.g., "example.com"
+ADMIN_NAME = os.environ.get("ADMIN_NAME", "Ben")  # Display name for admin in services
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@localhost")
 
 router = APIRouter(tags=["auth"])
@@ -89,7 +90,7 @@ async def forward_auth_verify(
     # Check admin session first
     session = await validate_session(admin_token)
     if session and session["type"] == "admin":
-        response_headers["X-Remote-User"] = "admin"
+        response_headers["X-Remote-User"] = ADMIN_NAME
         response_headers["X-Remote-Email"] = ADMIN_EMAIL
         return Response(status_code=200, headers=response_headers)
 
