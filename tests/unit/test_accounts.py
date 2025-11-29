@@ -263,3 +263,70 @@ class TestRegistryHandlers:
             # Should not attempt to delete
             mock_integration.delete_user.assert_not_called()
             assert result["action"] is None
+
+    @pytest.mark.asyncio
+    async def test_revoke_v2_with_dict_row_factory(self, mock_env):
+        """Test handle_service_revoke_v2 works when row_factory returns dicts.
+
+        This is a regression test for a bug where using row[0] instead of
+        row[column_name] caused KeyError when row_factory was set to return dicts.
+        """
+        from integrations.registry import handle_service_revoke_v2
+
+        mock_db = AsyncMock()
+        mock_cursor = AsyncMock()
+        # Simulate dict row (as returned when row_factory is set)
+        mock_cursor.fetchone.return_value = {"ombi_user_id": "user-123"}
+        mock_db.execute.return_value = mock_cursor
+
+        with patch('integrations.registry.get_integration') as mock_get:
+            mock_integration = AsyncMock()
+            mock_integration.delete_user.return_value = True
+            mock_get.return_value = mock_integration
+
+            result = await handle_service_revoke_v2(1, "ombi", mock_db)
+
+            mock_integration.delete_user.assert_called_once_with("user-123")
+            assert result["success"] is True
+            assert result["action"] == "deleted"
+
+    @pytest.mark.asyncio
+    async def test_revoke_v2_with_dict_row_empty_user_id(self, mock_env):
+        """Test handle_service_revoke_v2 with dict row containing empty user_id."""
+        from integrations.registry import handle_service_revoke_v2
+
+        mock_db = AsyncMock()
+        mock_cursor = AsyncMock()
+        # Simulate dict row with empty user_id
+        mock_cursor.fetchone.return_value = {"ombi_user_id": ""}
+        mock_db.execute.return_value = mock_cursor
+
+        with patch('integrations.registry.get_integration') as mock_get:
+            mock_integration = AsyncMock()
+            mock_get.return_value = mock_integration
+
+            result = await handle_service_revoke_v2(1, "ombi", mock_db)
+
+            # Should not attempt to delete when user_id is empty
+            mock_integration.delete_user.assert_not_called()
+            assert result["action"] is None
+
+    @pytest.mark.asyncio
+    async def test_revoke_v2_overseerr_with_dict_row(self, mock_env):
+        """Test overseerr revoke works with dict rows (real-world scenario)."""
+        from integrations.registry import handle_service_revoke_v2
+
+        mock_db = AsyncMock()
+        mock_cursor = AsyncMock()
+        mock_cursor.fetchone.return_value = {"overseerr_user_id": "16"}
+        mock_db.execute.return_value = mock_cursor
+
+        with patch('integrations.registry.get_integration') as mock_get:
+            mock_integration = AsyncMock()
+            mock_integration.delete_user.return_value = True
+            mock_get.return_value = mock_integration
+
+            result = await handle_service_revoke_v2(1, "overseerr", mock_db)
+
+            mock_integration.delete_user.assert_called_once_with("16")
+            assert result["success"] is True

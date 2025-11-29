@@ -231,11 +231,11 @@ async def handle_service_revoke_v2(
     )
     row = await cursor.fetchone()
 
-    if not row or not row[0]:
+    if not row or not row.get(user_id_col):
         # No user ID stored, nothing to delete
         return result
 
-    user_id = row[0]
+    user_id = row[user_id_col]
 
     # Delete the user
     if await integration.delete_user(user_id):
