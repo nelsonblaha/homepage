@@ -9,7 +9,7 @@ from services.session import verify_admin
 
 router = APIRouter(prefix="/api/health", tags=["health"])
 
-HEALTH_DAEMON_URL = "http://172.17.0.1:9876"
+HEALTH_DAEMON_URL = "http://localhost:9876"
 
 
 @router.get("/status")
