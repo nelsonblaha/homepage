@@ -30,6 +30,8 @@ class ConnectionManager:
         self.jitsi_participants: int = 0
         # Infrastructure health from blaha-health-daemon
         self.infra_health: Optional[dict] = None
+        # Track previous health check states for change detection (keyed by check_id)
+        self.infra_health_states: Dict[str, dict] = {}
 
     async def connect(self, websocket: WebSocket, token: Optional[str] = None):
         """Accept a new WebSocket connection."""
@@ -211,12 +213,66 @@ class ConnectionManager:
         })
 
     async def update_infra_health(self, health_data: dict):
-        """Update and broadcast infrastructure health to admins."""
+        """
+        Update and broadcast infrastructure health to admins.
+
+        Implements efficient change detection:
+        - Only broadcasts changes in severity, message, or new checks
+        - Batches multiple changes into a single update
+        - Sends full snapshot on first load or to new connections
+        """
+        # Store full data for new connections
         self.infra_health = health_data
-        await self.broadcast_to_admins({
-            "type": "infra_health",
-            **health_data
-        })
+
+        # Extract all results from the health data
+        all_results = health_data.get("results", [])
+
+        # Detect changes
+        changes = []
+        summary_changed = False
+
+        for check in all_results:
+            check_id = check.get("check_id")
+            if not check_id:
+                continue
+
+            # Get comparable state (exclude timestamp for comparison)
+            current_state = {
+                "severity": check.get("severity"),
+                "message": check.get("message"),
+                "container_name": check.get("container_name"),
+                "name": check.get("name")
+            }
+
+            previous_state = self.infra_health_states.get(check_id)
+
+            # Check if this is new or changed
+            if previous_state != current_state:
+                changes.append({
+                    "check_id": check_id,
+                    "name": check.get("name"),
+                    "severity": check.get("severity"),
+                    "message": check.get("message"),
+                    "details": check.get("details"),
+                    "container_name": check.get("container_name"),
+                    "timestamp": check.get("timestamp"),
+                    "changed": "new" if previous_state is None else "updated"
+                })
+
+                # Update stored state
+                self.infra_health_states[check_id] = current_state
+
+        # Broadcast changes if any
+        if changes:
+            await self.broadcast_to_admins({
+                "type": "infra_health_changes",
+                "changes": changes,
+                "summary": health_data.get("summary", {})
+            })
+
+        # Also check if summary changed significantly (for badge updates)
+        # Note: We still send summary with changes above, but this is for standalone updates
+        # if needed in the future
 
 
 # Global instance

@@ -1072,6 +1072,9 @@
                         case 'infra_health':
                             this.infraHealth = msg;
                             break;
+                        case 'infra_health_changes':
+                            this.handleInfraHealthChanges(msg);
+                            break;
                         case 'activity':
                             // Prepend new activity to the log
                             if (this.activityLog) {
@@ -1204,6 +1207,70 @@
                         // Secondary sort by name
                         return (a.name || '').localeCompare(b.name || '');
                     });
+                },
+
+                handleInfraHealthChanges(msg) {
+                    // Handle incremental health check updates from WebSocket
+                    if (!this.infraHealth) {
+                        // If we don't have initial data yet, initialize with empty structure
+                        this.infraHealth = {
+                            summary: msg.summary || {},
+                            infra: [],
+                            containers: {}
+                        };
+                    }
+
+                    // Update summary counts
+                    if (msg.summary) {
+                        this.infraHealth.summary = msg.summary;
+                    }
+
+                    // Process each changed check
+                    const changes = msg.changes || [];
+                    changes.forEach(change => {
+                        const isInfra = !change.container_name;
+
+                        if (isInfra) {
+                            // Infrastructure check (no container)
+                            const infraIndex = this.infraHealth.infra.findIndex(
+                                c => c.check_id === change.check_id
+                            );
+
+                            if (infraIndex >= 0) {
+                                // Update existing
+                                this.infraHealth.infra[infraIndex] = change;
+                            } else {
+                                // Add new
+                                this.infraHealth.infra.push(change);
+                            }
+                        } else {
+                            // Container-specific check
+                            const containerName = change.container_name;
+                            if (!this.infraHealth.containers[containerName]) {
+                                this.infraHealth.containers[containerName] = [];
+                            }
+
+                            const checkIndex = this.infraHealth.containers[containerName].findIndex(
+                                c => c.check_id === change.check_id
+                            );
+
+                            if (checkIndex >= 0) {
+                                // Update existing
+                                this.infraHealth.containers[containerName][checkIndex] = change;
+                            } else {
+                                // Add new
+                                this.infraHealth.containers[containerName].push(change);
+                            }
+                        }
+
+                        // Log notable changes to console (optional, for debugging)
+                        if (change.severity === 'warning' || change.severity === 'critical') {
+                            console.log(`🚨 Health check ${change.changed}: ${change.name} - ${change.message}`);
+                        }
+                    });
+
+                    // Force Alpine.js reactivity update by creating new object
+                    this.infraHealth = { ...this.infraHealth };
                 },
 
                 async refreshInfraHealth() {
