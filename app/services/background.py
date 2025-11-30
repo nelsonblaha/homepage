@@ -107,7 +107,9 @@ async def infra_health_check_loop():
                     data = response.json()
                     await ws_manager.update_infra_health(data)
         except Exception as e:
-            print(f"Infra health check error: {e}")
+            print(f"Infra health check error: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
         await asyncio.sleep(INFRA_HEALTH_INTERVAL)
 
