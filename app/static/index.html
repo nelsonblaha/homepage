@@ -597,94 +597,25 @@
 
                 <!-- INFRA TAB -->
                 <div x-show="adminTab === 'infra'" data-testid="infra-panel">
-                    <!-- Summary Cards -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-                        <div class="bg-gray-800 rounded-lg p-3 md:p-4 text-center">
-                            <div class="text-2xl md:text-3xl font-bold text-green-400" x-text="infraHealth?.summary?.ok || 0"></div>
-                            <div class="text-xs md:text-sm text-gray-400">OK</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-3 md:p-4 text-center">
-                            <div class="text-2xl md:text-3xl font-bold text-blue-400" x-text="infraHealth?.summary?.info || 0"></div>
-                            <div class="text-xs md:text-sm text-gray-400">Info</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-3 md:p-4 text-center">
-                            <div class="text-2xl md:text-3xl font-bold text-yellow-400" x-text="infraHealth?.summary?.warning || 0"></div>
-                            <div class="text-xs md:text-sm text-gray-400">Warning</div>
-                        </div>
-                        <div class="bg-gray-800 rounded-lg p-3 md:p-4 text-center">
-                            <div class="text-2xl md:text-3xl font-bold text-red-400" x-text="infraHealth?.summary?.critical || 0"></div>
-                            <div class="text-xs md:text-sm text-gray-400">Critical</div>
-                        </div>
-                    </div>
-
-                    <!-- Infrastructure Checks -->
-                    <div class="mb-6">
-                        <div class="bg-gray-800 rounded-lg overflow-hidden">
-                            <button @click="expandedInfra['infrastructure'] = !expandedInfra['infrastructure']"
-                                    class="w-full px-3 py-3 md:px-4 flex items-center justify-between hover:bg-gray-750 transition-colors">
-                                <div class="flex items-center gap-2 md:gap-3">
-                                    <span x-text="expandedInfra['infrastructure'] ? '▼' : '▶'" class="text-gray-400 text-xs md:text-sm"></span>
-                                    <h3 class="text-base md:text-lg font-semibold text-gray-300">Infrastructure</h3>
-                                </div>
-                                <span class="text-xs md:text-sm text-gray-500" x-text="(infraHealth?.infra || []).length + ' checks'"></span>
-                            </button>
-                            <div x-show="expandedInfra['infrastructure']" class="divide-y divide-gray-700 border-t border-gray-700">
-                                <template x-for="result in infraHealth?.infra || []" :key="result.check_id">
-                                    <div class="px-3 py-3 md:px-4">
-                                        <div class="flex items-start gap-2 md:gap-3 mb-1">
-                                            <span :class="{
-                                                'text-green-400': result.severity === 'ok',
-                                                'text-blue-400': result.severity === 'info',
-                                                'text-yellow-400': result.severity === 'warning',
-                                                'text-red-400': result.severity === 'critical'
-                                            }" class="flex-shrink-0" x-text="result.severity === 'ok' ? '●' : result.severity === 'warning' ? '⚠' : result.severity === 'critical' ? '✗' : 'ℹ'"></span>
-                                            <span class="font-medium text-sm md:text-base" x-text="result.name"></span>
-                                        </div>
-                                        <div class="text-xs md:text-sm text-gray-400 ml-5 md:ml-6" x-text="result.message"></div>
+                    <!-- All Infrastructure Checks (sorted by severity) -->
+                    <div class="bg-gray-800 rounded-lg divide-y divide-gray-700">
+                        <template x-for="check in getSortedInfraChecks()" :key="check.check_id">
+                            <div class="px-3 py-3 md:px-4">
+                                <div class="flex items-start gap-2 md:gap-3 mb-1">
+                                    <span :class="{
+                                        'text-green-400': check.severity === 'ok',
+                                        'text-blue-400': check.severity === 'info',
+                                        'text-yellow-400': check.severity === 'warning',
+                                        'text-red-400': check.severity === 'critical'
+                                    }" class="flex-shrink-0" x-text="check.severity === 'ok' ? '●' : check.severity === 'warning' ? '⚠' : check.severity === 'critical' ? '✗' : 'ℹ'"></span>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-sm md:text-base" x-text="check.name"></div>
+                                        <div class="text-xs md:text-sm text-gray-400 mt-0.5" x-text="check.message"></div>
+                                        <div class="text-xs text-gray-500 mt-0.5" x-text="'(' + check.source + ')'"></div>
                                     </div>
-                                </template>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Container Checks -->
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-300 mb-3">Containers</h3>
-                        <div class="space-y-2">
-                            <template x-for="(checks, container) in infraHealth?.containers || {}" :key="container">
-                                <div class="bg-gray-800 rounded-lg overflow-hidden">
-                                    <button @click="expandedInfra[container] = !expandedInfra[container]"
-                                            class="w-full px-3 py-3 md:px-4 flex items-start md:items-center justify-between hover:bg-gray-750 transition-colors">
-                                        <div class="flex items-start md:items-center gap-2 md:gap-3 flex-1 min-w-0">
-                                            <span x-text="expandedInfra[container] ? '▼' : '▶'" class="text-gray-400 text-xs md:text-sm flex-shrink-0 mt-0.5 md:mt-0"></span>
-                                            <span class="font-medium text-sm md:text-base break-all" x-text="container"></span>
-                                            <!-- Issue count badge -->
-                                            <span x-show="getContainerIssueCount(checks) > 0"
-                                                  class="text-xs px-1.5 py-0.5 md:px-2 rounded flex-shrink-0"
-                                                  :class="hasContainerCritical(checks) ? 'bg-red-500' : 'bg-yellow-500'"
-                                                  x-text="getContainerIssueCount(checks)"></span>
-                                        </div>
-                                        <span class="text-xs md:text-sm text-gray-500 flex-shrink-0 ml-2" x-text="checks.length"></span>
-                                    </button>
-                                    <div x-show="expandedInfra[container]" class="px-3 pb-3 md:px-4 border-t border-gray-700">
-                                        <template x-for="check in checks" :key="check.check_id">
-                                            <div class="py-2">
-                                                <div class="flex items-start gap-2 mb-1">
-                                                    <span :class="{
-                                                        'text-green-400': check.severity === 'ok',
-                                                        'text-blue-400': check.severity === 'info',
-                                                        'text-yellow-400': check.severity === 'warning',
-                                                        'text-red-400': check.severity === 'critical'
-                                                    }" class="flex-shrink-0 text-sm" x-text="check.severity === 'ok' ? '●' : check.severity === 'warning' ? '⚠' : check.severity === 'critical' ? '✗' : 'ℹ'"></span>
-                                                    <span class="text-xs md:text-sm font-medium" x-text="check.name.replace('Security: ' + container, '').replace('Logs: ' + container, '') || check.name"></span>
-                                                </div>
-                                                <div class="text-xs text-gray-400 ml-5 md:ml-6 break-words" x-text="check.message"></div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
+                        </template>
                     </div>
 
                     <!-- Refresh button -->
@@ -1237,6 +1168,39 @@
 
                 hasContainerCritical(checks) {
                     return checks.some(c => c.severity === 'critical');
+                },
+
+                getSortedInfraChecks() {
+                    // Combine infrastructure and container checks into one sorted list
+                    const allChecks = [];
+
+                    // Add infrastructure checks
+                    if (this.infraHealth?.infra) {
+                        this.infraHealth.infra.forEach(check => {
+                            allChecks.push({ ...check, source: 'infrastructure' });
+                        });
+                    }
+
+                    // Add container checks
+                    if (this.infraHealth?.containers) {
+                        Object.entries(this.infraHealth.containers).forEach(([container, checks]) => {
+                            checks.forEach(check => {
+                                allChecks.push({ ...check, source: container });
+                            });
+                        });
+                    }
+
+                    // Sort by severity: critical (red) → warning (yellow) → info (blue) → ok (green)
+                    const severityOrder = { 'critical': 0, 'warning': 1, 'info': 2, 'ok': 3 };
+                    return allChecks.sort((a, b) => {
+                        const orderA = severityOrder[a.severity] ?? 99;
+                        const orderB = severityOrder[b.severity] ?? 99;
+                        if (orderA !== orderB) {
+                            return orderA - orderB;
+                        }
+                        // Secondary sort by name
+                        return (a.name || '').localeCompare(b.name || '');
+                    });
                 },
 
                 async refreshInfraHealth() {
