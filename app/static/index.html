@@ -995,9 +995,12 @@
                     // Update URL without reload
                     const newPath = tab === 'friends' ? '/admin' : `/admin/${tab}`;
                     history.pushState({tab}, '', newPath);
-                    // Load activity data if switching to activity tab
+                    // Load data when switching to specific tabs
                     if (tab === 'activity') {
                         this.loadActivity();
+                    }
+                    if (tab === 'infra') {
+                        this.refreshInfraHealth();
                     }
                 },
 
@@ -1205,9 +1208,26 @@
 
                 async refreshInfraHealth() {
                     try {
-                        const resp = await fetch('/api/health/refresh', { method: 'POST' });
-                        if (resp.ok) {
-                            this.infraHealth = await resp.json();
+                        // Trigger refresh first
+                        await fetch('/api/health/refresh', { method: 'POST' });
+
+                        // Then fetch the formatted data
+                        const [statusResp, infraResp, containersResp] = await Promise.all([
+                            fetch('/api/health/status'),
+                            fetch('/api/health/infra'),
+                            fetch('/api/health/containers')
+                        ]);
+
+                        if (statusResp.ok && infraResp.ok && containersResp.ok) {
+                            const status = await statusResp.json();
+                            const infraData = await infraResp.json();
+                            const containersData = await containersResp.json();
+
+                            this.infraHealth = {
+                                summary: status.summary,
+                                infra: infraData.infra || [],
+                                containers: containersData.containers || {}
+                            };
                         }
                     } catch (e) {
                         console.error('Failed to refresh infra health:', e);
