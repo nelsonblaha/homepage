@@ -1702,7 +1702,11 @@
 
                 timeAgo(dateStr) {
                     if (!dateStr) return '';
-                    const date = new Date(dateStr);
+                    // Ensure ISO timestamp has timezone (append 'Z' for UTC if missing)
+                    const isoStr = dateStr.includes('Z') || dateStr.includes('+') || dateStr.includes('-', 10)
+                        ? dateStr
+                        : dateStr + 'Z';
+                    const date = new Date(isoStr);
                     const now = new Date();
                     const seconds = Math.floor((now - date) / 1000);
 
