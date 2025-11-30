@@ -619,22 +619,31 @@
 
                     <!-- Infrastructure Checks -->
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-300 mb-3">Infrastructure</h3>
-                        <div class="bg-gray-800 rounded-lg divide-y divide-gray-700">
-                            <template x-for="result in infraHealth?.infra || []" :key="result.check_id">
-                                <div class="px-3 py-3 md:px-4">
-                                    <div class="flex items-start gap-2 md:gap-3 mb-1">
-                                        <span :class="{
-                                            'text-green-400': result.severity === 'ok',
-                                            'text-blue-400': result.severity === 'info',
-                                            'text-yellow-400': result.severity === 'warning',
-                                            'text-red-400': result.severity === 'critical'
-                                        }" class="flex-shrink-0" x-text="result.severity === 'ok' ? '✓' : result.severity === 'warning' ? '⚠' : result.severity === 'critical' ? '✗' : 'ℹ'"></span>
-                                        <span class="font-medium text-sm md:text-base" x-text="result.name"></span>
-                                    </div>
-                                    <div class="text-xs md:text-sm text-gray-400 ml-5 md:ml-6" x-text="result.message"></div>
+                        <div class="bg-gray-800 rounded-lg overflow-hidden">
+                            <button @click="expandedInfra['infrastructure'] = !expandedInfra['infrastructure']"
+                                    class="w-full px-3 py-3 md:px-4 flex items-center justify-between hover:bg-gray-750 transition-colors">
+                                <div class="flex items-center gap-2 md:gap-3">
+                                    <span x-text="expandedInfra['infrastructure'] ? '▼' : '▶'" class="text-gray-400 text-xs md:text-sm"></span>
+                                    <h3 class="text-base md:text-lg font-semibold text-gray-300">Infrastructure</h3>
                                 </div>
-                            </template>
+                                <span class="text-xs md:text-sm text-gray-500" x-text="(infraHealth?.infra || []).length + ' checks'"></span>
+                            </button>
+                            <div x-show="expandedInfra['infrastructure']" class="divide-y divide-gray-700 border-t border-gray-700">
+                                <template x-for="result in infraHealth?.infra || []" :key="result.check_id">
+                                    <div class="px-3 py-3 md:px-4">
+                                        <div class="flex items-start gap-2 md:gap-3 mb-1">
+                                            <span :class="{
+                                                'text-green-400': result.severity === 'ok',
+                                                'text-blue-400': result.severity === 'info',
+                                                'text-yellow-400': result.severity === 'warning',
+                                                'text-red-400': result.severity === 'critical'
+                                            }" class="flex-shrink-0" x-text="result.severity === 'ok' ? '●' : result.severity === 'warning' ? '⚠' : result.severity === 'critical' ? '✗' : 'ℹ'"></span>
+                                            <span class="font-medium text-sm md:text-base" x-text="result.name"></span>
+                                        </div>
+                                        <div class="text-xs md:text-sm text-gray-400 ml-5 md:ml-6" x-text="result.message"></div>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </div>
 
@@ -666,7 +675,7 @@
                                                         'text-blue-400': check.severity === 'info',
                                                         'text-yellow-400': check.severity === 'warning',
                                                         'text-red-400': check.severity === 'critical'
-                                                    }" class="flex-shrink-0 text-sm" x-text="check.severity === 'ok' ? '✓' : check.severity === 'warning' ? '⚠' : check.severity === 'critical' ? '✗' : 'ℹ'"></span>
+                                                    }" class="flex-shrink-0 text-sm" x-text="check.severity === 'ok' ? '●' : check.severity === 'warning' ? '⚠' : check.severity === 'critical' ? '✗' : 'ℹ'"></span>
                                                     <span class="text-xs md:text-sm font-medium" x-text="check.name.replace('Security: ' + container, '').replace('Logs: ' + container, '') || check.name"></span>
                                                 </div>
                                                 <div class="text-xs text-gray-400 ml-5 md:ml-6 break-words" x-text="check.message"></div>
