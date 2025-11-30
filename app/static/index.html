@@ -597,17 +597,16 @@
 
                 <!-- INFRA TAB -->
                 <div x-show="adminTab === 'infra'" data-testid="infra-panel">
-                    <!-- All Infrastructure Checks (sorted by severity) -->
-                    <div class="bg-gray-800 rounded-lg divide-y divide-gray-700">
-                        <template x-for="check in getSortedInfraChecks()" :key="check.check_id">
+                    <!-- Issues (Critical, Warning, Info) -->
+                    <div class="bg-gray-800 rounded-lg divide-y divide-gray-700 mb-4">
+                        <template x-for="check in getInfraIssues()" :key="check.check_id">
                             <div class="px-3 py-3 md:px-4">
                                 <div class="flex items-start gap-2 md:gap-3 mb-1">
                                     <span :class="{
-                                        'text-green-400': check.severity === 'ok',
                                         'text-blue-400': check.severity === 'info',
                                         'text-yellow-400': check.severity === 'warning',
                                         'text-red-400': check.severity === 'critical'
-                                    }" class="flex-shrink-0" x-text="check.severity === 'ok' ? '●' : check.severity === 'warning' ? '⚠' : check.severity === 'critical' ? '✗' : 'ℹ'"></span>
+                                    }" class="flex-shrink-0" x-text="check.severity === 'warning' ? '⚠' : check.severity === 'critical' ? '✗' : 'ℹ'"></span>
                                     <div class="flex-1 min-w-0">
                                         <div class="font-medium text-sm md:text-base" x-text="check.name"></div>
                                         <div class="text-xs md:text-sm text-gray-400 mt-0.5" x-text="check.message"></div>
@@ -616,6 +615,39 @@
                                 </div>
                             </div>
                         </template>
+                        <template x-if="getInfraIssues().length === 0">
+                            <div class="px-4 py-6 text-center text-gray-500">
+                                <div class="text-green-400 text-2xl mb-2">✓</div>
+                                <div>All systems operational</div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- OK Checks (Collapsed by default) -->
+                    <div class="bg-gray-800 rounded-lg mb-4">
+                        <button @click="showOkChecks = !showOkChecks"
+                                class="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-750 transition-colors">
+                            <div class="flex items-center gap-2">
+                                <span class="text-green-400">●</span>
+                                <span class="font-medium">OK Checks</span>
+                                <span class="text-gray-500 text-sm" x-text="'(' + getInfraOkCount() + ')'"></span>
+                            </div>
+                            <span x-text="showOkChecks ? '▼' : '▶'" class="text-gray-500"></span>
+                        </button>
+                        <div x-show="showOkChecks" class="divide-y divide-gray-700">
+                            <template x-for="check in getInfraOkChecks()" :key="check.check_id">
+                                <div class="px-3 py-3 md:px-4">
+                                    <div class="flex items-start gap-2 md:gap-3 mb-1">
+                                        <span class="text-green-400 flex-shrink-0">●</span>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="font-medium text-sm md:text-base" x-text="check.name"></div>
+                                            <div class="text-xs md:text-sm text-gray-400 mt-0.5" x-text="check.message"></div>
+                                            <div class="text-xs text-gray-500 mt-0.5" x-text="'(' + check.source + ')'"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
                     </div>
 
                     <!-- Refresh button -->
@@ -880,6 +912,7 @@
                 jitsiParticipants: 0,
                 infraHealth: null,
                 expandedInfra: {},
+                showOkChecks: false,
                 editingServiceId: null,
                 editingDescription: '',
                 editingNameId: null,
@@ -1207,6 +1240,33 @@
                         // Secondary sort by name
                         return (a.name || '').localeCompare(b.name || '');
                     });
+                },
+
+                getInfraIssues() {
+                    // Get only non-OK checks (critical, warning, info)
+                    return this.getSortedInfraChecks().filter(c => c.severity !== 'ok');
+                },
+
+                getInfraOkChecks() {
+                    // Get only OK checks (lazy loaded when expanded)
+                    if (!this.showOkChecks) {
+                        return []; // Don't process OK checks until user expands
+                    }
+                    return this.getSortedInfraChecks().filter(c => c.severity === 'ok');
+                },
+
+                getInfraOkCount() {
+                    // Count OK checks without loading them
+                    let count = 0;
+                    if (this.infraHealth?.infra) {
+                        count += this.infraHealth.infra.filter(c => c.severity === 'ok').length;
+                    }
+                    if (this.infraHealth?.containers) {
+                        Object.values(this.infraHealth.containers).forEach(checks => {
+                            count += checks.filter(c => c.severity === 'ok').length;
+                        });
+                    }
+                    return count;
                 },
 
                 handleInfraHealthChanges(msg) {
