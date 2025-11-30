@@ -16,7 +16,7 @@ from websocket import manager as ws_manager
 HEALTH_CHECK_INTERVAL = 30
 JITSI_CHECK_INTERVAL = 5
 INFRA_HEALTH_INTERVAL = 30
-HEALTH_DAEMON_URL = "http://172.17.0.1:9876"
+HEALTH_DAEMON_URL = "http://blaha-health-daemon:8000"
 
 
 async def check_service_health(service_id: int, url: str) -> str:
