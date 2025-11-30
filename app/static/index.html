@@ -597,31 +597,47 @@
 
                 <!-- INFRA TAB -->
                 <div x-show="adminTab === 'infra'" data-testid="infra-panel">
+                    <!-- Loading State -->
+                    <template x-if="infraHealthLoading">
+                        <div class="bg-gray-800 rounded-lg mb-4">
+                            <div class="px-4 py-8 text-center text-gray-500">
+                                <div class="flex items-center justify-center gap-2 mb-2">
+                                    <span class="text-blue-400 text-xl animate-pulse">●</span>
+                                    <span class="text-blue-400 text-xl animate-pulse" style="animation-delay: 0.2s">●</span>
+                                    <span class="text-blue-400 text-xl animate-pulse" style="animation-delay: 0.4s">●</span>
+                                </div>
+                                <div>Loading health checks...</div>
+                            </div>
+                        </div>
+                    </template>
+
                     <!-- Issues (Critical, Warning, Info) -->
-                    <div class="bg-gray-800 rounded-lg divide-y divide-gray-700 mb-4">
-                        <template x-for="check in getInfraIssues()" :key="check.check_id">
-                            <div class="px-3 py-3 md:px-4">
-                                <div class="flex items-start gap-2 md:gap-3 mb-1">
-                                    <span :class="{
-                                        'text-blue-400': check.severity === 'info',
-                                        'text-yellow-400': check.severity === 'warning',
-                                        'text-red-400': check.severity === 'critical'
-                                    }" class="flex-shrink-0" x-text="check.severity === 'warning' ? '⚠' : check.severity === 'critical' ? '✗' : 'ℹ'"></span>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="font-medium text-sm md:text-base" x-text="check.name"></div>
-                                        <div class="text-xs md:text-sm text-gray-400 mt-0.5" x-text="check.message"></div>
-                                        <div class="text-xs text-gray-500 mt-0.5" x-text="'(' + check.source + ')'"></div>
+                    <template x-if="!infraHealthLoading">
+                        <div class="bg-gray-800 rounded-lg divide-y divide-gray-700 mb-4">
+                            <template x-for="check in getInfraIssues()" :key="check.check_id">
+                                <div class="px-3 py-3 md:px-4">
+                                    <div class="flex items-start gap-2 md:gap-3 mb-1">
+                                        <span :class="{
+                                            'text-blue-400': check.severity === 'info',
+                                            'text-yellow-400': check.severity === 'warning',
+                                            'text-red-400': check.severity === 'critical'
+                                        }" class="flex-shrink-0" x-text="check.severity === 'warning' ? '⚠' : check.severity === 'critical' ? '✗' : 'ℹ'"></span>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="font-medium text-sm md:text-base" x-text="check.name"></div>
+                                            <div class="text-xs md:text-sm text-gray-400 mt-0.5" x-text="check.message"></div>
+                                            <div class="text-xs text-gray-500 mt-0.5" x-text="'(' + check.source + ')'"></div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </template>
-                        <template x-if="getInfraIssues().length === 0">
-                            <div class="px-4 py-6 text-center text-gray-500">
-                                <div class="text-green-400 text-2xl mb-2">✓</div>
-                                <div>All systems operational</div>
-                            </div>
-                        </template>
-                    </div>
+                            </template>
+                            <template x-if="getInfraIssues().length === 0">
+                                <div class="px-4 py-6 text-center text-gray-500">
+                                    <div class="text-green-400 text-2xl mb-2">✓</div>
+                                    <div>All systems operational</div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
 
                     <!-- OK Checks (Collapsed by default) -->
                     <div class="bg-gray-800 rounded-lg mb-4">
@@ -911,6 +927,7 @@
                 overseerrStatus: { connected: false, error: '' },
                 jitsiParticipants: 0,
                 infraHealth: null,
+                infraHealthLoading: true,
                 expandedInfra: {},
                 showOkChecks: false,
                 editingServiceId: null,
@@ -1032,9 +1049,7 @@
                     if (tab === 'activity') {
                         this.loadActivity();
                     }
-                    if (tab === 'infra') {
-                        this.refreshInfraHealth();
-                    }
+                    // Infra health now loads at page init, not tab switch
                 },
 
                 async fetchJitsiParticipants() {
@@ -1161,6 +1176,9 @@
                     this.friends = await friendsResp.json();
                     this.accessRequests = await requestsResp.json();
                     await this.checkAllStatus();
+
+                    // Load infra health in background
+                    this.refreshInfraHealth();
                 },
 
                 async loadActivity() {
@@ -1280,6 +1298,9 @@
                         };
                     }
 
+                    // Clear loading state when we receive data
+                    this.infraHealthLoading = false;
+
                     // Update summary counts
                     if (msg.summary) {
                         this.infraHealth.summary = msg.summary;
@@ -1358,6 +1379,9 @@
                         }
                     } catch (e) {
                         console.error('Failed to refresh infra health:', e);
+                    } finally {
+                        // Clear loading state
+                        this.infraHealthLoading = false;
                     }
                 },
 
