@@ -1,3 +1,9 @@
+networks:
+  infra-net:
+    external: true
+  media-net:
+    external: true
+
 services:
   blaha-homepage:
     build: .
@@ -5,6 +11,14 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    network_mode: host
+    networks:
+      - infra-net
+      - media-net
+    ports:
+      - "8080:8100"
+    environment:
+      - VIRTUAL_HOST=blaha.io
+      - VIRTUAL_PORT=8100
+      - LETSENCRYPT_HOST=blaha.io
     volumes:
       - ./data:/app/data
