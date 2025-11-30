@@ -311,30 +311,41 @@
                 </div>
 
                 <!-- TABS -->
-                <div class="flex space-x-4 mb-6 border-b border-gray-700">
+                <div class="flex justify-around md:justify-start md:space-x-4 mb-6 border-b border-gray-700">
                     <button @click="setAdminTab('friends')" data-testid="tab-friends"
                             :class="adminTab === 'friends' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
-                            class="px-4 py-2 -mb-px">Friends</button>
+                            class="flex-1 md:flex-none px-2 md:px-4 py-2 -mb-px text-xs md:text-base">
+                        <span class="md:hidden">👥</span>
+                        <span class="hidden md:inline">Friends</span>
+                    </button>
                     <button @click="setAdminTab('services')" data-testid="tab-services"
                             :class="adminTab === 'services' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
-                            class="px-4 py-2 -mb-px">Services</button>
+                            class="flex-1 md:flex-none px-2 md:px-4 py-2 -mb-px text-xs md:text-base">
+                        <span class="md:hidden">⚙️</span>
+                        <span class="hidden md:inline">Services</span>
+                    </button>
                     <button @click="setAdminTab('requests')" data-testid="tab-requests"
                             :class="adminTab === 'requests' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
-                            class="px-4 py-2 -mb-px relative">
-                        Requests
+                            class="flex-1 md:flex-none px-2 md:px-4 py-2 -mb-px relative text-xs md:text-base">
+                        <span class="md:hidden">📬</span>
+                        <span class="hidden md:inline">Requests</span>
                         <span x-show="accessRequests.length > 0"
-                              class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                              class="absolute -top-1 -right-0 md:-right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center"
                               x-text="accessRequests.length"></span>
                     </button>
                     <button @click="setAdminTab('activity')" data-testid="tab-activity"
                             :class="adminTab === 'activity' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
-                            class="px-4 py-2 -mb-px">Activity</button>
+                            class="flex-1 md:flex-none px-2 md:px-4 py-2 -mb-px text-xs md:text-base">
+                        <span class="md:hidden">📊</span>
+                        <span class="hidden md:inline">Activity</span>
+                    </button>
                     <button @click="setAdminTab('infra')" data-testid="tab-infra"
                             :class="adminTab === 'infra' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-gray-400'"
-                            class="px-4 py-2 -mb-px relative">
-                        Infra
+                            class="flex-1 md:flex-none px-2 md:px-4 py-2 -mb-px relative text-xs md:text-base">
+                        <span class="md:hidden">🖥️</span>
+                        <span class="hidden md:inline">Infra</span>
                         <span x-show="infraHealth?.summary?.warning > 0 || infraHealth?.summary?.critical > 0"
-                              class="absolute -top-1 -right-1 text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                              class="absolute -top-1 -right-0 md:-right-1 text-xs rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center"
                               :class="infraHealth?.summary?.critical > 0 ? 'bg-red-500' : 'bg-yellow-500'"
                               x-text="(infraHealth?.summary?.warning || 0) + (infraHealth?.summary?.critical || 0)"></span>
                     </button>
