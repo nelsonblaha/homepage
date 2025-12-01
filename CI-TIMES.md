@@ -17,11 +17,13 @@ This file tracks typical CI run durations for the homepage project to help Claud
 
 ## Job Breakdown
 
+**Max Parallel Jobs: 3** (pytest + cypress-unit + integration-tests run concurrently)
+
 Individual job times (approximate):
 - **pytest (unit tests):** ~30-45s
 - **cypress-unit:** ~1m - 1m 30s
-- **cypress-e2e:** ~1m 30s - 2m
-- **deploy:** ~30-45s
+- **integration-tests:** ~1m 30s - 2m
+- **deploy:** ~30-45s (runs after all tests pass)
 
 ## Recommended Sleep Times
 
