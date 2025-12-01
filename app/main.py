@@ -261,5 +261,12 @@ async def friend_page(token: str, response: Response):
     return FileResponse("static/index.html")
 
 
+@app.get("/stefan")
+async def stefan_page():
+    """Static page for Stefan"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content="<html><body><h1>hi Stefan!</h1></body></html>")
+
+
 # Mount static files last to avoid overriding API routes
 app.mount("/static", StaticFiles(directory="static"), name="static")
