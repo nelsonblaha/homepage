@@ -22,7 +22,3 @@ services:
       - LETSENCRYPT_HOST=blaha.io
     volumes:
       - ./data:/app/data
-      - /:/host:ro
-    # Allow access to host filesystem for disk monitoring
-    pid: host
-    privileged: true

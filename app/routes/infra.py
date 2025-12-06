@@ -32,58 +32,20 @@ def bytes_to_human(bytes_val: int) -> str:
 
 @router.get("/disks")
 async def get_disk_info(_: bool = Depends(verify_admin)):
-    """Get disk usage information for storage volumes only"""
-    # Run df on the host, not inside container
-    # Use chroot to access host filesystem
-    result = subprocess.run(
-        ['chroot', '/host', 'df', '-h'],
-        capture_output=True,
-        text=True
-    )
-    disks = []
+    """Get disk usage information from host disk monitor service"""
+    import httpx
 
-    # Storage volumes we care about (actual disk mounts)
-    storage_mounts = {
-        "/": "System Root (LVM)",
-        "/boot": "Boot Partition",
-        "/boot/efi": "EFI Partition",
-        "/media/nvme": "NVMe Drive",
-        "/media/nvme-extra-space": "NVMe Extra (LVM)",
-        "/media/orico": "ORICO RAID (md1)",
-        "/media/internal-raid": "Internal RAID (md0)",
-    }
-
-    for line in result.stdout.split('\n'):
-        if not line.startswith('/dev/'):
-            continue
-
-        parts = line.split()
-        if len(parts) < 6:
-            continue
-
-        fs, size, used, avail, pct, mount = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
-
-        # Only include storage volumes, skip tmpfs, overlay, bind mounts, etc
-        if mount not in storage_mounts:
-            continue
-
-        disks.append({
-            'filesystem': fs,
-            'mount': mount,
-            'label': storage_mounts[mount],
-            'size': size,
-            'used': used,
-            'avail': avail,
-            'pct': int(pct.rstrip('%')),
-            'size_bytes': size_to_bytes(size),
-            'used_bytes': size_to_bytes(used),
-            'avail_bytes': size_to_bytes(avail),
-        })
-
-    max_bytes = max(d['size_bytes'] for d in disks) if disks else 0
-
-    return {
-        'disks': disks,
-        'max_bytes': max_bytes,
-        'max_human': bytes_to_human(max_bytes)
-    }
+    try:
+        # Query disk monitor service running on host
+        async with httpx.AsyncClient() as client:
+            resp = await client.get('http://172.17.0.1:9090/disks', timeout=5.0)
+            resp.raise_for_status()
+            return resp.json()
+    except Exception as e:
+        # Fallback error response
+        return {
+            'disks': [],
+            'max_bytes': 0,
+            'max_human': '0B',
+            'error': f'Failed to connect to disk monitor: {str(e)}'
+        }
