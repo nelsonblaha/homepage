@@ -33,7 +33,13 @@ def bytes_to_human(bytes_val: int) -> str:
 @router.get("/disks")
 async def get_disk_info(_: bool = Depends(verify_admin)):
     """Get disk usage information for storage volumes only"""
-    result = subprocess.run(['df', '-h'], capture_output=True, text=True)
+    # Run df on the host, not inside container
+    # Use nsenter to run command in host's mount namespace
+    result = subprocess.run(
+        ['nsenter', '--target', '1', '--mount', 'df', '-h'],
+        capture_output=True,
+        text=True
+    )
     disks = []
 
     # Storage volumes we care about (actual disk mounts)

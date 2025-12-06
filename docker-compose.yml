@@ -22,3 +22,7 @@ services:
       - LETSENCRYPT_HOST=blaha.io
     volumes:
       - ./data:/app/data
+    # Allow access to host filesystem for disk monitoring
+    pid: host
+    cap_add:
+      - SYS_ADMIN
