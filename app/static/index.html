@@ -112,49 +112,6 @@
                     </div>
                 </template>
 
-                <!-- Credentials Modal -->
-                <div x-show="showCredentials" x-cloak
-                     class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
-                     @click.self="showCredentials = false">
-                    <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-gray-700">
-                        <div class="text-center mb-6">
-                            <span class="text-4xl" x-text="credentialsService?.icon || '🔐'"></span>
-                            <h3 class="text-xl font-bold mt-2" x-text="credentialsService?.name"></h3>
-                        </div>
-
-                        <div class="space-y-4">
-                            <div>
-                                <label class="text-sm text-gray-400">Username</label>
-                                <div class="flex items-center gap-2 mt-1">
-                                    <code class="flex-1 bg-gray-700 px-3 py-2 rounded text-blue-300 font-mono" x-text="friendCredentials.username"></code>
-                                    <button @click="copyToClipboard(friendCredentials.username)"
-                                            class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm">Copy</button>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="text-sm text-gray-400">Password</label>
-                                <div class="flex items-center gap-2 mt-1">
-                                    <code class="flex-1 bg-gray-700 px-3 py-2 rounded text-green-300 font-mono" x-text="friendCredentials.password"></code>
-                                    <button @click="copyToClipboard(friendCredentials.password)"
-                                            class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm">Copy</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-6 flex gap-3">
-                            <a :href="getDirectServiceUrl(credentialsService)"
-                               target="_blank"
-                               class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded text-center transition-colors">
-                                Go to <span x-text="credentialsService?.name"></span> in new tab
-                            </a>
-                            <button @click="showCredentials = false"
-                                    class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors">
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
                 <footer class="text-center mt-12">
                     <a href="https://github.com/nelsonblaha/homepage" target="_blank"
                        class="text-gray-600 hover:text-gray-400 text-sm transition-colors">
@@ -893,6 +850,50 @@
                 </div>
             </div>
         </template>
+
+        <!-- Credentials Modal -->
+        <div x-show="showCredentials" x-cloak
+             class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+             @click.self="showCredentials = false">
+            <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-gray-700">
+                <div class="text-center mb-6">
+                    <span class="text-4xl" x-text="credentialsService?.icon || '🔐'"></span>
+                    <h3 class="text-xl font-bold mt-2" x-text="credentialsService?.name"></h3>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-sm text-gray-400">Username</label>
+                        <div class="flex items-center gap-2 mt-1">
+                            <code class="flex-1 bg-gray-700 px-3 py-2 rounded text-blue-300 font-mono" x-text="friendCredentials.username"></code>
+                            <button @click="copyToClipboard(friendCredentials.username)"
+                                    class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm">Copy</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-sm text-gray-400">Password</label>
+                        <div class="flex items-center gap-2 mt-1">
+                            <code class="flex-1 bg-gray-700 px-3 py-2 rounded text-green-300 font-mono" x-text="friendCredentials.password"></code>
+                            <button @click="copyToClipboard(friendCredentials.password)"
+                                    class="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded text-sm">Copy</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex gap-3">
+                    <a :href="getDirectServiceUrl(credentialsService)"
+                       target="_blank"
+                       class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded text-center transition-colors">
+                        Go to <span x-text="credentialsService?.name"></span>
+                    </a>
+                    <button @click="showCredentials = false"
+                            class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Edit Service Modal -->
         <div x-show="editService" x-cloak
