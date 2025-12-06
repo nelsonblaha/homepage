@@ -1,13 +1,13 @@
 """Authentication routes - admin login and service SSO"""
 import os
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Response, Cookie, Request, Header, Form
+from fastapi import APIRouter, HTTPException, Response, Cookie, Request, Header, Form, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 
 from database import get_db
 from models import AdminLogin
 from services.session import (
-    create_session, validate_session, delete_session,
+    create_session, validate_session, delete_session, verify_admin,
     SESSION_DURATION_SHORT, SESSION_DURATION_LONG
 )
 from integrations.ombi import authenticate_ombi, OMBI_URL
@@ -261,12 +261,310 @@ async def _auth_overseerr(friend: dict) -> Response:
     )
 
 
+async def _auth_nextcloud(friend: dict, subdomain: str) -> Response:
+    """Display Nextcloud credentials for manual login.
+
+    Nextcloud uses credential-display auth - we show the username/password
+    for the user to copy and paste into the login form.
+    """
+    if not friend.get("nextcloud_user_id") or not friend.get("nextcloud_password"):
+        raise HTTPException(status_code=403, detail="No Nextcloud account configured")
+
+    # Display credentials page
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Nextcloud Login - {friend['name']}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }}
+            .container {{
+                background: white;
+                padding: 2rem;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                max-width: 400px;
+                width: 90%;
+            }}
+            h1 {{
+                margin: 0 0 0.5rem 0;
+                color: #333;
+                font-size: 1.5rem;
+            }}
+            .subtitle {{
+                color: #666;
+                margin-bottom: 1.5rem;
+                font-size: 0.9rem;
+            }}
+            .credential {{
+                margin: 1rem 0;
+            }}
+            label {{
+                display: block;
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+                color: #555;
+                font-size: 0.9rem;
+            }}
+            .value {{
+                background: #f5f5f5;
+                padding: 0.75rem;
+                border-radius: 6px;
+                font-family: 'Courier New', monospace;
+                word-break: break-all;
+                position: relative;
+            }}
+            .copy-btn {{
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 0.6rem 1.2rem;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 0.9rem;
+                margin-top: 0.5rem;
+                width: 100%;
+                font-weight: 600;
+            }}
+            .copy-btn:hover {{
+                background: #5568d3;
+            }}
+            .continue-btn {{
+                background: #10b981;
+                color: white;
+                text-decoration: none;
+                display: block;
+                text-align: center;
+                padding: 0.75rem;
+                border-radius: 6px;
+                margin-top: 1.5rem;
+                font-weight: 600;
+            }}
+            .continue-btn:hover {{
+                background: #059669;
+            }}
+            .instructions {{
+                background: #fef3c7;
+                padding: 1rem;
+                border-radius: 6px;
+                margin-top: 1.5rem;
+                font-size: 0.85rem;
+                color: #92400e;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Nextcloud Access</h1>
+            <div class="subtitle">Hi {friend['name']}! Use these credentials to log in:</div>
+
+            <div class="credential">
+                <label>Username</label>
+                <div class="value" id="username">{friend['nextcloud_user_id']}</div>
+                <button class="copy-btn" onclick="copy('username')">Copy Username</button>
+            </div>
+
+            <div class="credential">
+                <label>Password</label>
+                <div class="value" id="password">{friend['nextcloud_password']}</div>
+                <button class="copy-btn" onclick="copy('password')">Copy Password</button>
+            </div>
+
+            <a href="https://{subdomain}.{BASE_DOMAIN}/" class="continue-btn">Continue to Nextcloud →</a>
+
+            <div class="instructions">
+                <strong>Instructions:</strong><br>
+                1. Copy your username and password<br>
+                2. Click "Continue to Nextcloud"<br>
+                3. Paste your credentials into the login form
+            </div>
+        </div>
+        <script>
+            function copy(id) {{
+                const text = document.getElementById(id).textContent;
+                navigator.clipboard.writeText(text).then(() => {{
+                    const btn = event.target;
+                    const original = btn.textContent;
+                    btn.textContent = '✓ Copied!';
+                    btn.style.background = '#10b981';
+                    setTimeout(() => {{
+                        btn.textContent = original;
+                        btn.style.background = '#667eea';
+                    }}, 2000);
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
+async def _auth_basic_credentials(friend: dict, subdomain: str, service_name: str) -> Response:
+    """Display HTTP Basic Auth credentials for manual login.
+
+    For services protected by HTTP basic auth (nginx level), we show
+    the admin's basic auth credentials since friends don't have individual accounts.
+    """
+    if not BASIC_AUTH_USER or not BASIC_AUTH_PASS:
+        raise HTTPException(status_code=500, detail="Basic auth not configured")
+
+    # Display credentials page
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>{service_name} Login - {friend['name']}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }}
+            .container {{
+                background: white;
+                padding: 2rem;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                max-width: 400px;
+                width: 90%;
+            }}
+            h1 {{
+                margin: 0 0 0.5rem 0;
+                color: #333;
+                font-size: 1.5rem;
+            }}
+            .subtitle {{
+                color: #666;
+                margin-bottom: 1.5rem;
+                font-size: 0.9rem;
+            }}
+            .credential {{
+                margin: 1rem 0;
+            }}
+            label {{
+                display: block;
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+                color: #555;
+                font-size: 0.9rem;
+            }}
+            .value {{
+                background: #f5f5f5;
+                padding: 0.75rem;
+                border-radius: 6px;
+                font-family: 'Courier New', monospace;
+                word-break: break-all;
+                position: relative;
+            }}
+            .copy-btn {{
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 0.6rem 1.2rem;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 0.9rem;
+                margin-top: 0.5rem;
+                width: 100%;
+                font-weight: 600;
+            }}
+            .copy-btn:hover {{
+                background: #5568d3;
+            }}
+            .continue-btn {{
+                background: #10b981;
+                color: white;
+                text-decoration: none;
+                display: block;
+                text-align: center;
+                padding: 0.75rem;
+                border-radius: 6px;
+                margin-top: 1.5rem;
+                font-weight: 600;
+            }}
+            .continue-btn:hover {{
+                background: #059669;
+            }}
+            .instructions {{
+                background: #fef3c7;
+                padding: 1rem;
+                border-radius: 6px;
+                margin-top: 1.5rem;
+                font-size: 0.85rem;
+                color: #92400e;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>{service_name} Access</h1>
+            <div class="subtitle">Hi {friend['name']}! Use these credentials to log in:</div>
+
+            <div class="credential">
+                <label>Username</label>
+                <div class="value" id="username">{BASIC_AUTH_USER}</div>
+                <button class="copy-btn" onclick="copy('username')">Copy Username</button>
+            </div>
+
+            <div class="credential">
+                <label>Password</label>
+                <div class="value" id="password">{BASIC_AUTH_PASS}</div>
+                <button class="copy-btn" onclick="copy('password')">Copy Password</button>
+            </div>
+
+            <a href="https://{subdomain}.{BASE_DOMAIN}/" class="continue-btn">Continue to {service_name} →</a>
+
+            <div class="instructions">
+                <strong>Instructions:</strong><br>
+                1. Copy the username and password<br>
+                2. Click "Continue to {service_name}"<br>
+                3. Enter the credentials when prompted by your browser
+            </div>
+        </div>
+        <script>
+            function copy(id) {{
+                const text = document.getElementById(id).textContent;
+                navigator.clipboard.writeText(text).then(() => {{
+                    const btn = event.target;
+                    const original = btn.textContent;
+                    btn.textContent = '✓ Copied!';
+                    btn.style.background = '#10b981';
+                    setTimeout(() => {{
+                        btn.textContent = original;
+                        btn.style.background = '#667eea';
+                    }}, 2000);
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
 @router.get("/auth/{subdomain}")
 async def unified_auth_redirect(subdomain: str, admin_token: Optional[str] = Cookie(default=None)):
-    """Unified auth endpoint for friends accessing services."""
+    """Unified auth endpoint for friends and admin accessing services."""
     session = await validate_session(admin_token)
-    if not session or session["type"] != "friend":
+    if not session:
         return RedirectResponse(url="/?auth=required", status_code=302)
+
+    is_admin = (session["type"] == "admin")
 
     async with await get_db() as db:
         db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
@@ -279,35 +577,77 @@ async def unified_auth_redirect(subdomain: str, admin_token: Optional[str] = Coo
         if not service:
             raise HTTPException(status_code=404, detail="Service not found")
 
-        cursor = await db.execute(
-            "SELECT 1 FROM friend_services WHERE friend_id = ? AND service_id = ?",
-            (session["user_id"], service["id"])
-        )
-        has_access = await cursor.fetchone()
-
-        if not has_access:
-            return RedirectResponse(
-                url=f"/?error=no_access&service={subdomain}",
-                status_code=302
+        # For admin, skip access check and create pseudo-friend object
+        if is_admin:
+            friend = {
+                "id": 0,
+                "name": ADMIN_NAME,
+                "token": "admin"
+            }
+        else:
+            # For friend users, check access
+            cursor = await db.execute(
+                "SELECT 1 FROM friend_services WHERE friend_id = ? AND service_id = ?",
+                (session["user_id"], service["id"])
             )
+            has_access = await cursor.fetchone()
 
-        cursor = await db.execute(
-            "SELECT * FROM friends WHERE id = ?", (session["user_id"],)
-        )
-        friend = await cursor.fetchone()
+            if not has_access:
+                return RedirectResponse(
+                    url=f"/?error=no_access&service={subdomain}",
+                    status_code=302
+                )
+
+            cursor = await db.execute(
+                "SELECT * FROM friends WHERE id = ?", (session["user_id"],)
+            )
+            friend = await cursor.fetchone()
 
         auth_type = service.get("auth_type", "none")
+        service_name = service.get("name", subdomain.title())
 
         if auth_type == "basic":
-            return await _auth_basic(subdomain)
+            # Show credentials page for HTTP basic auth services
+            return await _auth_basic_credentials(friend, subdomain, service_name)
         elif auth_type == "jellyfin":
             return await _auth_jellyfin(friend)
         elif auth_type == "ombi":
             return await _auth_ombi(friend)
         elif auth_type == "overseerr":
             return await _auth_overseerr(friend)
-        else:
+        elif auth_type == "nextcloud":
+            return await _auth_nextcloud(friend, subdomain)
+        elif auth_type == "none" or auth_type == "forward-auth":
+            # Services with no custom auth - just redirect
             return RedirectResponse(url=f"https://{subdomain}.{BASE_DOMAIN}/", status_code=302)
+        else:
+            # Unknown auth type - redirect anyway
+            return RedirectResponse(url=f"https://{subdomain}.{BASE_DOMAIN}/", status_code=302)
+
+
+@router.get("/api/admin/credentials/{subdomain}")
+async def get_admin_credentials(subdomain: str, _: bool = Depends(verify_admin)):
+    """Get credentials for services requiring basic auth (for admin modal)."""
+    async with await get_db() as db:
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        cursor = await db.execute(
+            "SELECT auth_type FROM services WHERE subdomain = ?", (subdomain,)
+        )
+        service = await cursor.fetchone()
+
+        if not service:
+            raise HTTPException(status_code=404, detail="Service not found")
+
+        auth_type = service.get("auth_type", "none")
+
+        if auth_type == "basic":
+            # Return HTTP basic auth credentials
+            return {
+                "username": BASIC_AUTH_USER,
+                "password": BASIC_AUTH_PASS
+            }
+        else:
+            raise HTTPException(status_code=400, detail="Service does not use basic auth")
 
 
 # Legacy endpoint for backwards compatibility

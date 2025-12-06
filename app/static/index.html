@@ -274,9 +274,8 @@
                         </div>
                         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             <template x-for="service in group.services" :key="service.id">
-                                <a :href="service.url"
-                                   target="_blank"
-                                   class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative">
+                                <div @click="handleServiceClick(service)"
+                                   class="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 text-center transition-colors border border-gray-700 hover:border-blue-500 relative cursor-pointer">
                                     <!-- Status indicator icon -->
                                     <template x-if="getServiceIcon(service)">
                                         <span class="absolute top-2 right-2 text-sm"
@@ -291,7 +290,7 @@
                                     <div x-show="service.icon" class="text-3xl mb-2" x-text="service.icon"></div>
                                     <div class="font-semibold" x-text="service.name"></div>
                                     <div x-show="service.description" class="text-sm text-gray-400 mt-1" x-text="service.description"></div>
-                                </a>
+                                </div>
                             </template>
                         </div>
                     </div>
@@ -1885,7 +1884,11 @@
                     console.log('showCredentialsModal called for:', service.name);
                     this.credentialsService = service;
                     try {
-                        const url = `/api/f/${this.friendToken}/credentials/${service.subdomain || service.name.toLowerCase()}`;
+                        // Use different endpoint for admin vs friend
+                        const isAdmin = (this.view === 'admin' || this.view === 'admin-services');
+                        const url = isAdmin
+                            ? `/api/admin/credentials/${service.subdomain || service.name.toLowerCase()}`
+                            : `/api/f/${this.friendToken}/credentials/${service.subdomain || service.name.toLowerCase()}`;
                         console.log('Fetching credentials from:', url);
                         const resp = await fetch(url);
                         if (resp.ok) {
