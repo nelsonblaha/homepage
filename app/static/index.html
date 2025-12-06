@@ -673,6 +673,85 @@
                             Refresh Health Checks
                         </button>
                     </div>
+
+                    <!-- Disk Usage Section -->
+                    <div class="bg-gray-800 rounded-lg p-6 mt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-semibold text-blue-300">Disk Usage</h3>
+                            <button @click="loadDiskUsage()" class="text-gray-400 hover:text-blue-400 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <template x-if="diskUsage.loading">
+                            <div class="text-center py-8 text-gray-400">
+                                <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mb-2"></div>
+                                <p class="text-sm">Loading disk information...</p>
+                            </div>
+                        </template>
+
+                        <template x-if="diskUsage.error">
+                            <div class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded">
+                                <span x-text="diskUsage.error"></span>
+                            </div>
+                        </template>
+
+                        <template x-if="!diskUsage.loading && !diskUsage.error && diskUsage.disks.length > 0">
+                            <div>
+                                <p class="text-xs text-gray-400 mb-4">
+                                    Reference: Largest disk = <span class="font-semibold text-white" x-text="diskUsage.maxHuman"></span> (100% bar width)
+                                </p>
+
+                                <div class="space-y-3">
+                                    <template x-for="disk in diskUsage.disks" :key="disk.mount">
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="font-semibold text-gray-300" x-text="disk.label"></span>
+                                                <span class="text-gray-500" x-text="disk.mount"></span>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <div class="flex-1 h-5 bg-gray-900 rounded-sm overflow-hidden flex">
+                                                    <div :style="`width: ${(disk.used_bytes / diskUsage.maxBytes) * 100}%`"
+                                                         :class="{
+                                                             'bg-green-600': disk.pct <= 60,
+                                                             'bg-yellow-500': disk.pct > 60 && disk.pct <= 80,
+                                                             'bg-red-600': disk.pct > 80
+                                                         }"
+                                                         class="h-full flex items-center justify-center">
+                                                    </div>
+                                                    <div :style="`width: ${(disk.avail_bytes / diskUsage.maxBytes) * 100}%`"
+                                                         class="h-full bg-cyan-900/30">
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-3 text-xs w-80">
+                                                    <span :class="{
+                                                        'text-green-400': disk.pct <= 60,
+                                                        'text-yellow-400': disk.pct > 60 && disk.pct <= 80,
+                                                        'text-red-400': disk.pct > 80
+                                                    }" class="font-semibold w-10 text-right" x-text="disk.pct + '%'"></span>
+                                                    <span class="text-gray-500">Used:</span>
+                                                    <span class="text-white w-14 text-right" x-text="disk.used"></span>
+                                                    <span class="text-gray-500">Avail:</span>
+                                                    <span class="text-white w-14 text-right" x-text="disk.avail"></span>
+                                                    <span class="text-gray-500">Total:</span>
+                                                    <span class="text-white w-14 text-right" x-text="disk.size"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                <div class="mt-4 pt-3 border-t border-gray-700 text-xs text-gray-500">
+                                    <span class="font-semibold">Legend:</span>
+                                    <span class="ml-3 text-green-400">■</span> <span>Healthy (&lt;60%)</span>
+                                    <span class="ml-3 text-yellow-400">■</span> <span>Warning (60-80%)</span>
+                                    <span class="ml-3 text-red-400">■</span> <span>Critical (&gt;80%)</span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
                 </div>
 
                 <!-- SERVICES TAB -->
@@ -930,6 +1009,7 @@
                 infraHealthLoading: true,
                 expandedInfra: {},
                 showOkChecks: false,
+                diskUsage: { loading: false, error: '', disks: [], maxBytes: 0, maxHuman: '' },
                 editingServiceId: null,
                 editingDescription: '',
                 editingNameId: null,
@@ -1048,6 +1128,8 @@
                     // Load data when switching to specific tabs
                     if (tab === 'activity') {
                         this.loadActivity();
+                    } else if (tab === 'infra') {
+                        this.loadDiskUsage();
                     }
                     // Infra health now loads at page init, not tab switch
                 },
@@ -1382,6 +1464,31 @@
                     } finally {
                         // Clear loading state
                         this.infraHealthLoading = false;
+                    }
+                },
+
+                async loadDiskUsage() {
+                    this.diskUsage.loading = true;
+                    this.diskUsage.error = '';
+                    try {
+                        const resp = await fetch('/api/infra/disks');
+                        if (!resp.ok) {
+                            if (resp.status === 401 || resp.status === 403) {
+                                this.diskUsage.error = 'Authentication required';
+                            } else {
+                                this.diskUsage.error = `Failed to load disk info (${resp.status})`;
+                            }
+                            return;
+                        }
+                        const data = await resp.json();
+                        this.diskUsage.disks = data.disks;
+                        this.diskUsage.maxBytes = data.max_bytes;
+                        this.diskUsage.maxHuman = data.max_human;
+                    } catch (e) {
+                        this.diskUsage.error = `Failed to load disk info: ${e.message}`;
+                        console.error('Failed to load disk usage:', e);
+                    } finally {
+                        this.diskUsage.loading = false;
                     }
                 },
 
