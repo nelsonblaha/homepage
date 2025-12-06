@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infrastructure - Disk Usage</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%233b82f6' width='100' height='100' rx='20'/><text x='50' y='72' font-size='60' font-family='system-ui,sans-serif' font-weight='bold' fill='white' text-anchor='middle'>I</text></svg>">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .label-editable:hover {
+            cursor: text;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <div x-data="infraApp()" x-init="init()" x-cloak>
+        <!-- Header -->
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h1 class="text-4xl font-bold text-blue-400 mb-2">Infrastructure</h1>
+                    <p class="text-gray-500">Disk usage monitoring</p>
+                </div>
+                <a href="/" class="text-blue-400 hover:text-blue-300 transition-colors">
+                    ← Back to Home
+                </a>
+            </div>
+
+            <!-- Error Message -->
+            <div x-show="error" class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-6">
+                <span x-text="error"></span>
+            </div>
+
+            <!-- Loading State -->
+            <div x-show="loading" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400"></div>
+                <p class="mt-4 text-gray-400">Loading disk information...</p>
+            </div>
+
+            <!-- Disk Usage Display -->
+            <div x-show="!loading && !error">
+                <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-2xl font-bold text-blue-300">Disk Usage Overview</h2>
+                        <button @click="loadDisks()" class="text-gray-400 hover:text-blue-400 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <p class="text-sm text-gray-400 mb-6">
+                        Reference: Largest disk = <span class="font-semibold text-white" x-text="maxHuman"></span> (100% bar width)
+                    </p>
+                    <p class="text-xs text-gray-500 mb-6">
+                        Click on any storage name to edit its label
+                    </p>
+
+                    <!-- Disk List -->
+                    <div class="space-y-4">
+                        <template x-for="disk in disks" :key="disk.mount">
+                            <div class="flex flex-col space-y-1">
+                                <!-- Label (clickable) -->
+                                <div class="flex items-center justify-between">
+                                    <div @click="startEditLabel(disk.mount, getLabel(disk.mount))"
+                                         class="font-bold text-sm w-64 px-2 py-1 rounded label-editable"
+                                         x-text="getLabel(disk.mount)">
+                                    </div>
+                                    <div class="text-xs text-gray-500" x-text="disk.mount"></div>
+                                </div>
+
+                                <!-- Progress Bar Container -->
+                                <div class="flex items-center gap-4">
+                                    <!-- Bar -->
+                                    <div class="flex-1 flex items-center gap-2">
+                                        <span class="text-gray-600">[</span>
+                                        <div class="flex-1 h-6 flex">
+                                            <!-- Used portion -->
+                                            <div :style="`width: ${(disk.used_bytes / maxBytes) * 100}%`"
+                                                 :class="getBarColor(disk.pct)"
+                                                 class="h-full flex items-center justify-center text-xs">
+                                                <span class="text-white font-semibold opacity-90">█</span>
+                                            </div>
+                                            <!-- Available portion -->
+                                            <div :style="`width: ${(disk.avail_bytes / maxBytes) * 100}%`"
+                                                 class="h-full bg-cyan-900/30 flex items-center justify-center text-xs">
+                                                <span class="text-cyan-400">░</span>
+                                            </div>
+                                            <!-- Empty portion (relative to max disk) -->
+                                            <div :style="`width: ${((maxBytes - disk.size_bytes) / maxBytes) * 100}%`"
+                                                 class="h-full">
+                                            </div>
+                                        </div>
+                                        <span class="text-gray-600">]</span>
+                                    </div>
+
+                                    <!-- Stats -->
+                                    <div class="flex items-center gap-4 text-sm w-96">
+                                        <span :class="getTextColor(disk.pct)" class="font-semibold w-12 text-right" x-text="disk.pct + '%'"></span>
+                                        <span class="text-blue-400">Used:</span>
+                                        <span class="text-white w-16 text-right" x-text="disk.used"></span>
+                                        <span class="text-cyan-400">Avail:</span>
+                                        <span class="text-white w-16 text-right" x-text="disk.avail"></span>
+                                        <span class="text-gray-400">Total:</span>
+                                        <span class="text-white w-16 text-right" x-text="disk.size"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="mt-8 pt-4 border-t border-gray-700 text-sm">
+                        <span class="font-semibold text-gray-400">Legend:</span>
+                        <span class="ml-4 text-green-400">█</span> <span class="text-gray-500">Used (healthy)</span>
+                        <span class="ml-4 text-yellow-400">█</span> <span class="text-gray-500">Used (warning)</span>
+                        <span class="ml-4 text-red-400">█</span> <span class="text-gray-500">Used (critical)</span>
+                        <span class="ml-4 text-cyan-400">░</span> <span class="text-gray-500">Available</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Label Modal -->
+        <div x-show="editingLabel"
+             class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+             @click.self="cancelEdit()">
+            <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+                <h3 class="text-xl font-semibold mb-4">Edit Storage Label</h3>
+                <form @submit.prevent="saveLabel()">
+                    <div class="mb-4">
+                        <label class="block text-sm text-gray-400 mb-2">Mount Point</label>
+                        <input type="text" x-model="editMount" readonly
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-gray-500">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm text-gray-400 mb-2">Custom Label</label>
+                        <input type="text" x-model="editLabel"
+                               class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-blue-500"
+                               placeholder="Enter custom label"
+                               autofocus>
+                    </div>
+                    <div class="flex gap-3">
+                        <button type="submit"
+                                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
+                            Save
+                        </button>
+                        <button type="button" @click="cancelEdit()"
+                                class="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-2 px-4 rounded transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function infraApp() {
+            return {
+                loading: true,
+                error: '',
+                disks: [],
+                maxBytes: 0,
+                maxHuman: '',
+                labels: {},
+                editingLabel: false,
+                editMount: '',
+                editLabel: '',
+
+                async init() {
+                    // Load custom labels from localStorage
+                    const saved = localStorage.getItem('diskLabels');
+                    if (saved) {
+                        try {
+                            this.labels = JSON.parse(saved);
+                        } catch (e) {
+                            console.error('Failed to parse saved labels:', e);
+                        }
+                    }
+
+                    await this.loadDisks();
+                    // Auto-refresh every 60 seconds
+                    setInterval(() => this.loadDisks(), 60000);
+                },
+
+                async loadDisks() {
+                    try {
+                        const resp = await fetch('/api/infra/disks');
+                        if (!resp.ok) {
+                            if (resp.status === 401 || resp.status === 403) {
+                                this.error = 'Authentication required. Please log in as admin.';
+                            } else {
+                                this.error = `Failed to load disk information (${resp.status})`;
+                            }
+                            this.loading = false;
+                            return;
+                        }
+
+                        const data = await resp.json();
+                        this.disks = data.disks;
+                        this.maxBytes = data.max_bytes;
+                        this.maxHuman = data.max_human;
+                        this.error = '';
+                    } catch (err) {
+                        this.error = `Failed to load disk information: ${err.message}`;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                getLabel(mount) {
+                    return this.labels[mount] || this.disks.find(d => d.mount === mount)?.label || mount;
+                },
+
+                getBarColor(pct) {
+                    if (pct > 80) return 'bg-red-600';
+                    if (pct > 60) return 'bg-yellow-500';
+                    return 'bg-green-600';
+                },
+
+                getTextColor(pct) {
+                    if (pct > 80) return 'text-red-400';
+                    if (pct > 60) return 'text-yellow-400';
+                    return 'text-green-400';
+                },
+
+                startEditLabel(mount, currentLabel) {
+                    this.editMount = mount;
+                    this.editLabel = currentLabel;
+                    this.editingLabel = true;
+                },
+
+                saveLabel() {
+                    this.labels[this.editMount] = this.editLabel;
+                    localStorage.setItem('diskLabels', JSON.stringify(this.labels));
+                    this.editingLabel = false;
+                    this.editMount = '';
+                    this.editLabel = '';
+                },
+
+                cancelEdit() {
+                    this.editingLabel = false;
+                    this.editMount = '';
+                    this.editLabel = '';
+                }
+            };
+        }
+    </script>
+</body>
+</html>
