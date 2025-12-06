@@ -34,9 +34,9 @@ def bytes_to_human(bytes_val: int) -> str:
 async def get_disk_info(_: bool = Depends(verify_admin)):
     """Get disk usage information for storage volumes only"""
     # Run df on the host, not inside container
-    # Use nsenter to run command in host's mount namespace
+    # Use chroot to access host filesystem
     result = subprocess.run(
-        ['nsenter', '--target', '1', '--mount', 'df', '-h'],
+        ['chroot', '/host', 'df', '-h'],
         capture_output=True,
         text=True
     )
