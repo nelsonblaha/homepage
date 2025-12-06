@@ -32,12 +32,12 @@ def bytes_to_human(bytes_val: int) -> str:
 
 @router.get("/disks")
 async def get_disk_info(_: bool = Depends(verify_admin)):
-    """Get disk usage information"""
+    """Get disk usage information for storage volumes only"""
     result = subprocess.run(['df', '-h'], capture_output=True, text=True)
     disks = []
 
-    # Default labels
-    labels = {
+    # Storage volumes we care about (actual disk mounts)
+    storage_mounts = {
         "/": "System Root (LVM)",
         "/boot": "Boot Partition",
         "/boot/efi": "EFI Partition",
@@ -57,10 +57,14 @@ async def get_disk_info(_: bool = Depends(verify_admin)):
 
         fs, size, used, avail, pct, mount = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
 
+        # Only include storage volumes, skip tmpfs, overlay, bind mounts, etc
+        if mount not in storage_mounts:
+            continue
+
         disks.append({
             'filesystem': fs,
             'mount': mount,
-            'label': labels.get(mount, mount),
+            'label': storage_mounts[mount],
             'size': size,
             'used': used,
             'avail': avail,
