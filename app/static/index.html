@@ -1886,20 +1886,26 @@
                     try {
                         // Use different endpoint for admin vs friend
                         const isAdmin = (this.view === 'admin' || this.view === 'admin-services');
+                        console.log('Current view:', this.view, 'isAdmin:', isAdmin);
                         const url = isAdmin
                             ? `/api/admin/credentials/${service.subdomain || service.name.toLowerCase()}`
                             : `/api/f/${this.friendToken}/credentials/${service.subdomain || service.name.toLowerCase()}`;
                         console.log('Fetching credentials from:', url);
                         const resp = await fetch(url);
+                        console.log('Response status:', resp.status, 'ok:', resp.ok);
                         if (resp.ok) {
                             const data = await resp.json();
+                            console.log('Got credentials, setting modal state');
                             this.friendCredentials = { username: data.username, password: data.password };
                             this.showCredentials = true;
+                            console.log('Modal should now be visible, showCredentials =', this.showCredentials);
                         } else {
+                            console.log('Response not OK, opening service directly');
                             // No stored credentials, just open the service
                             window.open(this.getDirectServiceUrl(service), '_blank');
                         }
                     } catch (e) {
+                        console.error('Error in showCredentialsModal:', e);
                         window.open(this.getDirectServiceUrl(service), '_blank');
                     }
                 },
