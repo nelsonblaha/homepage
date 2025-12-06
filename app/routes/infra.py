@@ -32,13 +32,13 @@ def bytes_to_human(bytes_val: int) -> str:
 
 @router.get("/disks")
 async def get_disk_info(_: bool = Depends(verify_admin)):
-    """Get disk usage information from host disk monitor service"""
+    """Get disk usage information from host health daemon service"""
     import httpx
 
     try:
-        # Query disk monitor service running on host
+        # Query health daemon service running on host
         async with httpx.AsyncClient() as client:
-            resp = await client.get('http://172.17.0.1:9090/disks', timeout=5.0)
+            resp = await client.get('http://172.17.0.1:9876/api/health/disks', timeout=5.0)
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
@@ -47,5 +47,5 @@ async def get_disk_info(_: bool = Depends(verify_admin)):
             'disks': [],
             'max_bytes': 0,
             'max_human': '0B',
-            'error': f'Failed to connect to disk monitor: {str(e)}'
+            'error': f'Failed to connect to health daemon: {str(e)}'
         }
