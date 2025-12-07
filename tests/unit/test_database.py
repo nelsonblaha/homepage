@@ -161,7 +161,7 @@ async def test_cascade_delete_friend_removes_services(test_db):
         cursor = await db.execute("SELECT id FROM friends")
         friend_id = (await cursor.fetchone())[0]
 
-        await db.execute("INSERT INTO friend_services VALUES (?, ?)", (friend_id, service_id))
+        await db.execute("INSERT INTO friend_services (friend_id, service_id) VALUES (?, ?)", (friend_id, service_id))
         await db.commit()
 
         # Delete friend
@@ -334,7 +334,7 @@ async def test_friend_services_requires_valid_friend(test_db):
 
         # Try to create relationship with non-existent friend
         with pytest.raises(sqlite3.IntegrityError):
-            await db.execute("INSERT INTO friend_services VALUES (9999, ?)", (service_id,))
+            await db.execute("INSERT INTO friend_services (friend_id, service_id) VALUES (9999, ?)", (service_id,))
             await db.commit()
 
 
@@ -353,5 +353,5 @@ async def test_friend_services_requires_valid_service(test_db):
 
         # Try to create relationship with non-existent service
         with pytest.raises(sqlite3.IntegrityError):
-            await db.execute("INSERT INTO friend_services VALUES (?, 9999)", (friend_id,))
+            await db.execute("INSERT INTO friend_services (friend_id, service_id) VALUES (?, 9999)", (friend_id,))
             await db.commit()

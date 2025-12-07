@@ -37,14 +37,30 @@ def generate_password(length: int = 24) -> str:
 
     Uses mix of uppercase, lowercase, digits, and safe special characters.
     Avoids ambiguous characters (0/O, 1/l/I).
+    Ensures at least one character from each category.
     """
     # Exclude ambiguous characters
-    alphabet = string.ascii_uppercase.replace('O', '').replace('I', '')
-    alphabet += string.ascii_lowercase.replace('l', '').replace('o', '')
-    alphabet += string.digits.replace('0', '').replace('1', '')
-    alphabet += "!@#$%^&*-_=+"
+    uppercase = string.ascii_uppercase.replace('O', '').replace('I', '')
+    lowercase = string.ascii_lowercase.replace('l', '').replace('o', '')
+    digits = string.digits.replace('0', '').replace('1', '')
+    special = "!@#$%^&*-_=+"
 
-    return ''.join(secrets.choice(alphabet) for _ in range(length))
+    # Ensure at least one from each category
+    password_chars = [
+        secrets.choice(uppercase),
+        secrets.choice(lowercase),
+        secrets.choice(digits),
+        secrets.choice(special)
+    ]
+
+    # Fill the rest randomly
+    alphabet = uppercase + lowercase + digits + special
+    password_chars.extend(secrets.choice(alphabet) for _ in range(length - 4))
+
+    # Shuffle to avoid predictable positions
+    secrets.SystemRandom().shuffle(password_chars)
+
+    return ''.join(password_chars)
 
 
 def update_htpasswd(subdomain: str, username: str, password: str) -> None:
