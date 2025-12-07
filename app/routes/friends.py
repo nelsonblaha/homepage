@@ -8,6 +8,7 @@ from database import get_db
 from models import Friend, FriendCreate, FriendUpdate, FriendView
 from services.session import verify_admin, SESSION_DURATION_LONG
 from services.accounts import MANAGED_SERVICES, handle_service_grant, handle_service_revoke
+from services.credentials import provision_credentials, revoke_credentials
 from services.friend_auth import (
     check_auth_requirements, increment_usage, verify_password, verify_totp,
     hash_password, generate_totp_secret, get_totp_uri,
@@ -77,15 +78,29 @@ async def create_friend(friend: FriendCreate, _: bool = Depends(verify_admin)):
         if service_ids_to_add:
             placeholders = ",".join("?" * len(service_ids_to_add))
             cursor = await db.execute(
-                f"SELECT id, name FROM services WHERE id IN ({placeholders})",
+                f"SELECT id, name, subdomain, auth_type FROM services WHERE id IN ({placeholders})",
                 service_ids_to_add
             )
             services_info = await cursor.fetchall()
 
             # Create accounts for managed services (Ombi, Jellyfin, Plex)
-            for service_id, service_name in services_info:
+            for service_id, service_name, subdomain, auth_type in services_info:
                 if service_name.lower() in MANAGED_SERVICES:
                     await handle_service_grant(friend_id, friend.name, service_name, db)
+
+                # Provision basic auth credentials for services that require it
+                if auth_type == 'basic' and subdomain:
+                    try:
+                        username, password = await provision_credentials(friend.name, subdomain)
+                        await db.execute(
+                            """UPDATE friend_services
+                               SET basic_auth_username = ?, basic_auth_password = ?
+                               WHERE friend_id = ? AND service_id = ?""",
+                            (username, password, friend_id, service_id)
+                        )
+                    except Exception as e:
+                        # Log but don't fail - credentials can be regenerated later
+                        print(f"Warning: Failed to provision basic auth for {service_name}: {e}")
 
         await db.commit()
 
@@ -142,9 +157,24 @@ async def update_friend(friend_id: int, update: FriendUpdate, _: bool = Depends(
             added_ids = new_ids - current_ids
             removed_ids = current_ids - new_ids
 
+            # Get detailed service info for added and removed services
+            if added_ids:
+                placeholders = ",".join("?" * len(added_ids))
+                cursor = await db.execute(
+                    f"SELECT id, name, subdomain, auth_type FROM services WHERE id IN ({placeholders})",
+                    tuple(added_ids)
+                )
+                added_services_info = {row["id"]: row for row in await cursor.fetchall()}
+            else:
+                added_services_info = {}
+
             # Handle auto-account creation for added managed services
             for service_id in added_ids:
-                service_name = all_services.get(service_id, "")
+                service_info = added_services_info.get(service_id)
+                if not service_info:
+                    continue
+
+                service_name = service_info["name"]
                 if service_name.lower() in MANAGED_SERVICES:
                     col = MANAGED_SERVICES[service_name.lower()]
                     if not friend.get(col):
@@ -158,16 +188,58 @@ async def update_friend(friend_id: int, update: FriendUpdate, _: bool = Depends(
                     result = await handle_service_revoke(friend_id, service_name, db)
                     account_results.append(result)
 
+            # Get credentials for removed basic auth services BEFORE deletion
+            if removed_ids:
+                placeholders = ",".join("?" * len(removed_ids))
+                cursor = await db.execute(
+                    f"""SELECT fs.basic_auth_username, s.subdomain
+                       FROM friend_services fs
+                       JOIN services s ON fs.service_id = s.id
+                       WHERE fs.friend_id = ? AND s.id IN ({placeholders}) AND s.auth_type = 'basic'""",
+                    (friend_id, *removed_ids)
+                )
+                removed_creds = await cursor.fetchall()
+
+                # Revoke basic auth credentials
+                for row in removed_creds:
+                    if row["basic_auth_username"]:
+                        try:
+                            await revoke_credentials(row["subdomain"], row["basic_auth_username"])
+                        except Exception as e:
+                            print(f"Warning: Failed to revoke credentials for {row['subdomain']}: {e}")
+
             # Update service associations
             await db.execute(
                 "DELETE FROM friend_services WHERE friend_id = ?",
                 (friend_id,)
             )
+
+            # Provision credentials for new basic auth services as we insert
+            credentials_cache = {}  # Cache provisioned credentials by service_id
+            for service_id in added_ids:
+                service_info = added_services_info.get(service_id)
+                if service_info and service_info["auth_type"] == 'basic' and service_info["subdomain"]:
+                    try:
+                        username, password = await provision_credentials(friend["name"], service_info["subdomain"])
+                        credentials_cache[service_id] = (username, password)
+                    except Exception as e:
+                        print(f"Warning: Failed to provision credentials for {service_info['name']}: {e}")
+
+            # Insert all services with appropriate credentials
             for service_id in update.service_ids:
-                await db.execute(
-                    "INSERT INTO friend_services (friend_id, service_id) VALUES (?, ?)",
-                    (friend_id, service_id)
-                )
+                if service_id in credentials_cache:
+                    username, password = credentials_cache[service_id]
+                    await db.execute(
+                        """INSERT INTO friend_services
+                           (friend_id, service_id, basic_auth_username, basic_auth_password)
+                           VALUES (?, ?, ?, ?)""",
+                        (friend_id, service_id, username, password)
+                    )
+                else:
+                    await db.execute(
+                        "INSERT INTO friend_services (friend_id, service_id) VALUES (?, ?)",
+                        (friend_id, service_id)
+                    )
 
         await db.commit()
 
@@ -215,6 +287,23 @@ async def delete_friend(friend_id: int, delete_accounts: bool = True, _: bool = 
                     await jellyseerr_integration.delete_user(friend["jellyseerr_user_id"])
                 if friend.get("mattermost_user_id"):
                     await delete_mattermost_user(friend["mattermost_user_id"])
+
+        # Revoke all basic auth credentials before deleting friend_services
+        cursor = await db.execute(
+            """SELECT fs.basic_auth_username, s.subdomain
+               FROM friend_services fs
+               JOIN services s ON fs.service_id = s.id
+               WHERE fs.friend_id = ? AND s.auth_type = 'basic'
+               AND fs.basic_auth_username IS NOT NULL AND fs.basic_auth_username != ''""",
+            (friend_id,)
+        )
+        basic_auth_creds = await cursor.fetchall()
+
+        for row in basic_auth_creds:
+            try:
+                await revoke_credentials(row["subdomain"], row["basic_auth_username"])
+            except Exception as e:
+                print(f"Warning: Failed to revoke credentials for {row['subdomain']}: {e}")
 
         await db.execute("DELETE FROM friend_services WHERE friend_id = ?", (friend_id,))
         await db.execute("DELETE FROM friends WHERE id = ?", (friend_id,))
@@ -439,7 +528,7 @@ async def verify_friend_totp(token: str, code: str):
 
 @public_router.get("/f/{token}/credentials/{service_key}")
 async def get_friend_credentials(token: str, service_key: str):
-    """Get stored credentials for a service (Nextcloud, etc.)"""
+    """Get stored credentials for a service (Nextcloud, basic auth, etc.)"""
     async with await get_db() as db:
         db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
 
@@ -452,7 +541,25 @@ async def get_friend_credentials(token: str, service_key: str):
         if not friend:
             raise HTTPException(status_code=404, detail="Invalid link")
 
-        # Map service key to credential fields
+        # Check if this is a basic auth service first
+        cursor = await db.execute(
+            """SELECT fs.basic_auth_username, fs.basic_auth_password
+               FROM services s
+               JOIN friend_services fs ON s.id = fs.service_id
+               WHERE s.subdomain = ? AND fs.friend_id = ? AND s.auth_type = 'basic'""",
+            (service_key, friend["id"])
+        )
+        basic_creds = await cursor.fetchone()
+
+        if basic_creds and basic_creds["basic_auth_username"]:
+            await log_activity(db, ACTION_CREDENTIAL_VIEW, friend_id=friend["id"], details=service_key)
+            await db.commit()
+            return {
+                "username": basic_creds["basic_auth_username"],
+                "password": basic_creds["basic_auth_password"]
+            }
+
+        # Map service key to credential fields for managed services
         credential_map = {
             "nextcloud": ("nextcloud_user_id", "nextcloud_password"),
             "ombi": ("ombi_user_id", "ombi_password"),

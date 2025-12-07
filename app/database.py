@@ -268,6 +268,21 @@ async def init_db():
         except:
             pass  # Column already exists
 
+        # =====================================================================
+        # MIGRATIONS FOR friend_services TABLE
+        # =====================================================================
+
+        # Migration: Add basic_auth_username and basic_auth_password for per-friend credentials
+        try:
+            await db.execute("ALTER TABLE friend_services ADD COLUMN basic_auth_username TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
+        try:
+            await db.execute("ALTER TABLE friend_services ADD COLUMN basic_auth_password TEXT DEFAULT ''")
+        except:
+            pass  # Column already exists
+
         await db.commit()
 
 
