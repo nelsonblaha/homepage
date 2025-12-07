@@ -780,6 +780,12 @@
                                                     </div>
                                                 </div>
 
+                                                <!-- Authentication & Security Overview -->
+                                                <div class="bg-gray-700/50 rounded p-3">
+                                                    <div class="text-sm font-medium text-gray-300 mb-2">🔐 Authentication & Security</div>
+                                                    <div class="text-sm text-gray-300 space-y-2" x-html="getSecurityDescription(service)"></div>
+                                                </div>
+
                                                 <!-- Integration Status (for managed services) -->
                                                 <div x-show="isManagedService(service)" class="bg-gray-700/50 rounded p-3">
                                                     <div class="text-sm font-medium text-gray-300 mb-2">Integration</div>
@@ -2352,6 +2358,102 @@
                     }
 
                     return icons ? { icons, title: parts.join(' | ') } : null;
+                },
+
+                // Get comprehensive security description for service detail view
+                getSecurityDescription(service) {
+                    const canCreate = this.canAutoCreateAccount(service);
+                    const isManualLogin = this.needsManualLogin(service);
+                    const isAuto = this.isAutoAuth(service);
+                    let html = '';
+
+                    // Authentication Method
+                    html += '<div><strong class="text-gray-400">Authentication:</strong> ';
+                    if (service.auth_type === 'basic') {
+                        html += '<span class="text-blue-300">Per-User HTTP Basic Auth</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Each friend gets unique credentials (e.g., annette_sonarr). Admin uses shared credentials.</span>';
+                    } else if (service.auth_type === 'forward-auth') {
+                        html += '<span class="text-blue-300">Homepage SSO</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Users must log into homepage first, then access is seamless.</span>';
+                    } else if (service.auth_type === 'plex') {
+                        html += '<span class="text-blue-300">Plex Managed Users</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Friends use Plex managed user accounts with optional PIN.</span>';
+                    } else if (service.auth_type === 'jellyfin' || service.auth_type === 'ombi' || service.auth_type === 'overseerr' || service.auth_type === 'mattermost' || service.auth_type === 'jellyseerr') {
+                        html += '<span class="text-blue-300">Service-Native Authentication</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Service has built-in user accounts and session management.</span>';
+                    } else if (service.auth_type === 'nextcloud') {
+                        html += '<span class="text-blue-300">Service-Native (Manual Login)</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Homepage displays credentials, friend logs in manually.</span>';
+                    } else {
+                        html += '<span class="text-gray-400">None (Public)</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Service is publicly accessible without authentication.</span>';
+                    }
+                    html += '</div>';
+
+                    // User Management
+                    if (canCreate) {
+                        html += '<div class="mt-2"><strong class="text-gray-400">User Management:</strong> ';
+                        html += '<span class="text-green-300">Auto-Provision</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Homepage automatically creates/deletes user accounts when service is granted/revoked.</span>';
+                        html += '</div>';
+                    }
+
+                    // Auto-Login Capability
+                    if (isAuto) {
+                        html += '<div class="mt-2"><strong class="text-gray-400">Login Experience:</strong> ';
+                        html += '<span class="text-green-300">Auto-Login</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Friends are automatically logged in when clicking from homepage.</span>';
+                        html += '</div>';
+                    } else if (service.auth_type === 'basic') {
+                        html += '<div class="mt-2"><strong class="text-gray-400">Login Experience:</strong> ';
+                        html += '<span class="text-yellow-300">Auto-Inject (with fallback)</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Homepage attempts to inject credentials automatically. If browser blocks, credentials are displayed for manual entry.</span>';
+                        html += '</div>';
+                    } else if (isManualLogin) {
+                        html += '<div class="mt-2"><strong class="text-gray-400">Login Experience:</strong> ';
+                        html += '<span class="text-yellow-300">Manual Login</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Homepage displays credentials in a modal. Friend copies and pastes into login form.</span>';
+                        html += '</div>';
+                    }
+
+                    // Public Exposure
+                    html += '<div class="mt-2"><strong class="text-gray-400">Network Exposure:</strong> ';
+                    if (service.subdomain) {
+                        html += '<span class="text-orange-300">Public</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Accessible at ' + service.subdomain + '.' + this.baseDomain + ' via HTTPS (Let\'s Encrypt SSL).</span>';
+                    } else {
+                        html += '<span class="text-green-300">Local Only</span><br>';
+                        html += '<span class="text-gray-400 text-xs ml-4">Only accessible from localhost or same Docker network. Not exposed to internet.</span>';
+                    }
+                    html += '</div>';
+
+                    // Security Protections
+                    html += '<div class="mt-2"><strong class="text-gray-400">Security Protections:</strong><br>';
+                    const protections = [];
+                    if (service.auth_type === 'basic' || service.auth_type === 'forward-auth') {
+                        protections.push('<span class="text-green-300">🛡️ fail2ban</span> - Bans IPs after 5 failed auth attempts');
+                    }
+                    if (service.subdomain) {
+                        protections.push('<span class="text-green-300">🔒 HTTPS</span> - All traffic encrypted via SSL/TLS');
+                    }
+                    if (service.auth_type === 'basic') {
+                        protections.push('<span class="text-green-300">🔐 Per-User Creds</span> - Individual accountability, easy revocation');
+                    }
+                    if (service.auth_type !== 'none' && service.auth_type) {
+                        protections.push('<span class="text-green-300">🚫 Auth Required</span> - Unauthorized access prevented');
+                    }
+                    if (!service.subdomain) {
+                        protections.push('<span class="text-green-300">🏠 Firewall</span> - Not exposed to internet (localhost only)');
+                    }
+
+                    if (protections.length > 0) {
+                        html += '<span class="text-gray-400 text-xs ml-4">' + protections.join('<br><span class="text-gray-400 text-xs ml-4">') + '</span>';
+                    } else {
+                        html += '<span class="text-gray-400 text-xs ml-4">None (public service)</span>';
+                    }
+                    html += '</div>';
+
+                    return html;
                 },
 
                 // Load integration status for all managed services
