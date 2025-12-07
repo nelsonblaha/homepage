@@ -261,6 +261,34 @@ async def _auth_overseerr(friend: dict) -> Response:
     )
 
 
+async def _auth_mattermost(friend: dict) -> Response:
+    """Authenticate to Mattermost and redirect to setup page on chat subdomain.
+
+    Mattermost uses session cookies, so we redirect to chat.{BASE_DOMAIN}/api/mattermost/auth-setup
+    which handles login and sets cookies.
+    """
+    from integrations.mattermost import mattermost_integration
+
+    if not mattermost_integration.service_url:
+        raise HTTPException(status_code=400, detail="Mattermost not configured")
+
+    if not friend.get("mattermost_user_id") or not friend.get("mattermost_password"):
+        raise HTTPException(status_code=403, detail="No Mattermost account configured")
+
+    from urllib.parse import urlencode
+    # Email format matches what we create in mattermost.py
+    email = f"{friend['name'].lower().replace(' ', '')}@{BASE_DOMAIN}"
+    params = urlencode({
+        "email": email,
+        "password": friend["mattermost_password"]
+    })
+    # Redirect to chat subdomain so cookies are set on correct domain
+    return RedirectResponse(
+        url=f"https://chat.{BASE_DOMAIN}/api/mattermost/auth-setup?{params}",
+        status_code=302
+    )
+
+
 async def _auth_nextcloud(friend: dict, subdomain: str) -> Response:
     """Display Nextcloud credentials for manual login.
 
@@ -842,6 +870,8 @@ async def unified_auth_redirect(subdomain: str, admin_token: Optional[str] = Coo
             return await _auth_overseerr(friend)
         elif auth_type == "nextcloud":
             return await _auth_nextcloud(friend, subdomain)
+        elif auth_type == "mattermost":
+            return await _auth_mattermost(friend)
         elif auth_type == "none" or auth_type == "forward-auth":
             # Services with no custom auth - just redirect
             return RedirectResponse(url=f"https://{subdomain}.{BASE_DOMAIN}/", status_code=302)

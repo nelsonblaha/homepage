@@ -1805,8 +1805,8 @@
                     // Includes: auto-login services AND services that bypass basic auth (open access)
                     const authType = service.auth_type || '';
 
-                    // Auto-login implementations
-                    if (authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr') {
+                    // Auto-login implementations (cookie proxy and token injection)
+                    if (authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr' || authType === 'mattermost') {
                         return true;
                     }
                     // Services that bypass basic auth - accessible without login (video chat, freeciv, etc)
@@ -1818,8 +1818,11 @@
 
                 needsManualLogin(service) {
                     // Services where we have stored credentials but user must enter them manually
+                    // Nextcloud: shows credentials modal for copy/paste
+                    // Basic auth: shows credentials modal for browser basic auth
+                    // (Mattermost is NOT manual - it auto-logins via cookie proxy)
                     const authType = service.auth_type || '';
-                    return authType === 'nextcloud' || authType === 'mattermost' || authType === 'basic';
+                    return authType === 'nextcloud' || authType === 'basic';
                 },
 
                 hasKnownAuthType(service) {
