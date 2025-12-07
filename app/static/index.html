@@ -2306,32 +2306,52 @@
                     let icons = '';
                     let parts = [];
 
-                    // Person emoji if we can create accounts
+                    // User management capability
                     if (canCreate) {
                         icons += '👤';
-                        parts.push('auto-creates account');
+                        parts.push('auto-provision users');
                     }
 
-                    // Then show login method
+                    // Authentication method
                     if (isDown) {
                         icons += '❌';
                         parts.push('service down');
+                    } else if (service.auth_type === 'basic') {
+                        icons += '🔒';
+                        parts.push('per-user HTTP basic auth');
                     } else if (isManualLogin) {
                         icons += '✏️';
-                        parts.push('manual login');
+                        parts.push('manual login with credentials');
                     } else if (isAuto) {
                         icons += '↗️';
-                        parts.push('auto-login');
+                        parts.push('auto-login via session');
                     } else if (service.auth_type === 'plex') {
-                        icons += '🔑';
-                        parts.push('external Plex account');
+                        icons += '🔐';
+                        parts.push('Plex managed users');
+                    } else if (service.auth_type === 'forward-auth') {
+                        icons += '🎫';
+                        parts.push('homepage SSO');
                     } else if (service.auth_type === 'none' || !service.auth_type) {
-                        // No integration - admin uses own credentials
-                        icons += '🔑';
-                        parts.push('own credentials');
+                        icons += '🔓';
+                        parts.push('no authentication');
                     }
 
-                    return icons ? { icons, title: parts.join(', ') } : null;
+                    // Security status
+                    if (service.subdomain) {
+                        icons += '🌐';
+                        parts.push(`public (${service.subdomain}.${this.baseDomain})`);
+                    } else {
+                        icons += '🏠';
+                        parts.push('local only');
+                    }
+
+                    // fail2ban protection (basic auth services get fail2ban)
+                    if (service.auth_type === 'basic' || service.auth_type === 'forward-auth') {
+                        icons += '🛡️';
+                        parts.push('fail2ban protected');
+                    }
+
+                    return icons ? { icons, title: parts.join(' | ') } : null;
                 },
 
                 // Load integration status for all managed services
