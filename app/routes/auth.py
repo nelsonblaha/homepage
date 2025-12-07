@@ -409,16 +409,217 @@ async def _auth_nextcloud(friend: dict, subdomain: str) -> Response:
     return HTMLResponse(content=html)
 
 
-async def _auth_basic_credentials(friend: dict, subdomain: str, service_name: str) -> Response:
-    """Display HTTP Basic Auth credentials for manual login.
+async def _auth_basic_credentials(friend: dict, subdomain: str, service_name: str, username: str, password: str, try_auto: bool = True) -> Response:
+    """Display HTTP Basic Auth credentials with auto-inject attempt.
 
-    For services protected by HTTP basic auth (nginx level), we show
-    the admin's basic auth credentials since friends don't have individual accounts.
+    For services protected by HTTP basic auth (nginx level), we:
+    1. Try to auto-inject credentials via URL (if try_auto=True)
+    2. Fall back to displaying credentials for manual entry
+
+    Args:
+        friend: Friend dict with id and name
+        subdomain: Service subdomain (e.g., "sonarr")
+        service_name: Display name of service
+        username: Basic auth username for this friend+service
+        password: Basic auth password for this friend+service
+        try_auto: Whether to attempt auto-inject (default True)
     """
-    if not BASIC_AUTH_USER or not BASIC_AUTH_PASS:
-        raise HTTPException(status_code=500, detail="Basic auth not configured")
+    if not username or not password:
+        raise HTTPException(status_code=500, detail="Credentials not provisioned for this service")
 
-    # Display credentials page
+    # If try_auto, show auto-inject page that attempts redirect with credentials
+    if try_auto:
+        from urllib.parse import quote
+        user_enc = quote(username, safe='')
+        pass_enc = quote(password, safe='')
+        preauth_url = f"https://{user_enc}:{pass_enc}@{subdomain}.{BASE_DOMAIN}/"
+
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>{service_name} - Auto Login</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    margin: 0;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                }}
+                .container {{
+                    background: white;
+                    padding: 2rem;
+                    border-radius: 12px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                    max-width: 400px;
+                    width: 90%;
+                    text-align: center;
+                }}
+                h1 {{
+                    margin: 0 0 1rem 0;
+                    color: #333;
+                    font-size: 1.5rem;
+                }}
+                .spinner {{
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #667eea;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    animation: spin 1s linear infinite;
+                    margin: 1rem auto;
+                }}
+                @keyframes spin {{
+                    0% {{ transform: rotate(0deg); }}
+                    100% {{ transform: rotate(360deg); }}
+                }}
+                .fallback {{
+                    display: none;
+                    margin-top: 1.5rem;
+                }}
+                .show-creds-btn {{
+                    background: #667eea;
+                    color: white;
+                    border: none;
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    margin-top: 1rem;
+                }}
+                .show-creds-btn:hover {{
+                    background: #5568d3;
+                }}
+                .credentials {{
+                    display: none;
+                    text-align: left;
+                    margin-top: 1.5rem;
+                }}
+                .credential {{
+                    margin: 1rem 0;
+                }}
+                label {{
+                    display: block;
+                    font-weight: 600;
+                    margin-bottom: 0.5rem;
+                    color: #555;
+                    font-size: 0.9rem;
+                }}
+                .value {{
+                    background: #f5f5f5;
+                    padding: 0.75rem;
+                    border-radius: 6px;
+                    font-family: 'Courier New', monospace;
+                    word-break: break-all;
+                }}
+                .copy-btn {{
+                    background: #667eea;
+                    color: white;
+                    border: none;
+                    padding: 0.6rem 1.2rem;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 0.9rem;
+                    margin-top: 0.5rem;
+                    width: 100%;
+                    font-weight: 600;
+                }}
+                .copy-btn:hover {{
+                    background: #5568d3;
+                }}
+                .continue-btn {{
+                    background: #10b981;
+                    color: white;
+                    text-decoration: none;
+                    display: block;
+                    text-align: center;
+                    padding: 0.75rem;
+                    border-radius: 6px;
+                    margin-top: 1rem;
+                    font-weight: 600;
+                }}
+                .continue-btn:hover {{
+                    background: #059669;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Logging you into {service_name}...</h1>
+                <div class="spinner"></div>
+                <p style="color: #666; margin-top: 1rem;">Redirecting in <span id="countdown">3</span> seconds...</p>
+
+                <div class="fallback" id="fallback">
+                    <p style="color: #666;">If you're not redirected automatically:</p>
+                    <button class="show-creds-btn" onclick="showCredentials()">Show My Credentials</button>
+
+                    <div class="credentials" id="credentials">
+                        <div class="credential">
+                            <label>Username</label>
+                            <div class="value" id="username">{username}</div>
+                            <button class="copy-btn" onclick="copy('username')">Copy Username</button>
+                        </div>
+
+                        <div class="credential">
+                            <label>Password</label>
+                            <div class="value" id="password">{password}</div>
+                            <button class="copy-btn" onclick="copy('password')">Copy Password</button>
+                        </div>
+
+                        <a href="https://{subdomain}.{BASE_DOMAIN}/" class="continue-btn">Continue to {service_name} →</a>
+                    </div>
+                </div>
+            </div>
+            <script>
+                let countdown = 3;
+                const countdownEl = document.getElementById('countdown');
+                const fallbackEl = document.getElementById('fallback');
+
+                // Countdown timer
+                const timer = setInterval(() => {{
+                    countdown--;
+                    countdownEl.textContent = countdown;
+                    if (countdown <= 0) {{
+                        clearInterval(timer);
+                        window.location.href = '{preauth_url}';
+                    }}
+                }}, 1000);
+
+                // Show fallback after 5 seconds
+                setTimeout(() => {{
+                    fallbackEl.style.display = 'block';
+                }}, 5000);
+
+                function showCredentials() {{
+                    document.getElementById('credentials').style.display = 'block';
+                    event.target.style.display = 'none';
+                }}
+
+                function copy(id) {{
+                    const text = document.getElementById(id).textContent;
+                    navigator.clipboard.writeText(text).then(() => {{
+                        const btn = event.target;
+                        const original = btn.textContent;
+                        btn.textContent = '✓ Copied!';
+                        btn.style.background = '#10b981';
+                        setTimeout(() => {{
+                            btn.textContent = original;
+                            btn.style.background = '#667eea';
+                        }}, 2000);
+                    }});
+                }}
+            </script>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html)
+
+    # Fallback: just show credentials modal
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -517,13 +718,13 @@ async def _auth_basic_credentials(friend: dict, subdomain: str, service_name: st
 
             <div class="credential">
                 <label>Username</label>
-                <div class="value" id="username">{BASIC_AUTH_USER}</div>
+                <div class="value" id="username">{username}</div>
                 <button class="copy-btn" onclick="copy('username')">Copy Username</button>
             </div>
 
             <div class="credential">
                 <label>Password</label>
-                <div class="value" id="password">{BASIC_AUTH_PASS}</div>
+                <div class="value" id="password">{password}</div>
                 <button class="copy-btn" onclick="copy('password')">Copy Password</button>
             </div>
 
@@ -607,8 +808,32 @@ async def unified_auth_redirect(subdomain: str, admin_token: Optional[str] = Coo
         service_name = service.get("name", subdomain.title())
 
         if auth_type == "basic":
-            # Show credentials page for HTTP basic auth services
-            return await _auth_basic_credentials(friend, subdomain, service_name)
+            # For basic auth services, retrieve friend's personal credentials
+            if is_admin:
+                # Admin uses the shared admin credentials
+                username = BASIC_AUTH_USER
+                password = BASIC_AUTH_PASS
+            else:
+                # Friend uses their per-service credentials
+                cursor = await db.execute(
+                    """SELECT fs.basic_auth_username, fs.basic_auth_password
+                       FROM friend_services fs
+                       WHERE fs.friend_id = ? AND fs.service_id = ?""",
+                    (friend["id"], service["id"])
+                )
+                creds = await cursor.fetchone()
+
+                if not creds or not creds["basic_auth_username"]:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Credentials not provisioned for this service. Contact admin."
+                    )
+
+                username = creds["basic_auth_username"]
+                password = creds["basic_auth_password"]
+
+            # Show credentials page with auto-inject attempt
+            return await _auth_basic_credentials(friend, subdomain, service_name, username, password)
         elif auth_type == "jellyfin":
             return await _auth_jellyfin(friend)
         elif auth_type == "ombi":
