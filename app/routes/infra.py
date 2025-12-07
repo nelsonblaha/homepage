@@ -34,11 +34,14 @@ def bytes_to_human(bytes_val: int) -> str:
 async def get_disk_info(_: bool = Depends(verify_admin)):
     """Get disk usage information from host health daemon service"""
     import httpx
+    import os
+
+    health_daemon_url = os.getenv('HEALTH_DAEMON_URL', 'http://172.17.0.1:9876')
 
     try:
         # Query health daemon service running on host
         async with httpx.AsyncClient() as client:
-            resp = await client.get('http://172.17.0.1:9876/api/health/disks', timeout=5.0)
+            resp = await client.get(f'{health_daemon_url}/api/health/disks', timeout=5.0)
             resp.raise_for_status()
             return resp.json()
     except Exception as e:
