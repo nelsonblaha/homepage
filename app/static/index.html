@@ -1806,7 +1806,7 @@
                     const authType = service.auth_type || '';
 
                     // Auto-login implementations (cookie proxy and token injection)
-                    if (authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr' || authType === 'mattermost') {
+                    if (authType === 'jellyfin' || authType === 'ombi' || authType === 'overseerr') {
                         return true;
                     }
                     // Services that bypass basic auth - accessible without login (video chat, freeciv, etc)
@@ -1819,16 +1819,16 @@
                 needsManualLogin(service) {
                     // Services where we have stored credentials but user must enter them manually
                     // Nextcloud: shows credentials modal for copy/paste
+                    // Mattermost-creds: shows credentials modal for Mattermost login
                     // Basic auth: shows credentials modal for browser basic auth
-                    // (Mattermost is NOT manual - it auto-logins via cookie proxy)
                     const authType = service.auth_type || '';
-                    return authType === 'nextcloud' || authType === 'basic';
+                    return authType === 'nextcloud' || authType === 'mattermost-creds' || authType === 'basic';
                 },
 
                 hasKnownAuthType(service) {
                     // Check if service has a known auth type (for showing/hiding icons)
                     const authType = service.auth_type || '';
-                    const knownTypes = ['jellyfin', 'ombi', 'overseerr', 'forward-auth', 'open', 'nextcloud', 'mattermost', 'basic', 'plex'];
+                    const knownTypes = ['jellyfin', 'ombi', 'overseerr', 'forward-auth', 'open', 'nextcloud', 'mattermost-creds', 'basic', 'plex'];
                     return knownTypes.includes(authType);
                 },
 
@@ -2381,10 +2381,10 @@
                     } else if (service.auth_type === 'plex') {
                         html += '<span class="text-blue-300">Plex Managed Users</span><br>';
                         html += '<span class="text-gray-400 text-xs ml-4">Friends use Plex managed user accounts with optional PIN.</span>';
-                    } else if (service.auth_type === 'jellyfin' || service.auth_type === 'ombi' || service.auth_type === 'overseerr' || service.auth_type === 'mattermost' || service.auth_type === 'jellyseerr') {
+                    } else if (service.auth_type === 'jellyfin' || service.auth_type === 'ombi' || service.auth_type === 'overseerr' || service.auth_type === 'jellyseerr') {
                         html += '<span class="text-blue-300">Service-Native Authentication</span><br>';
                         html += '<span class="text-gray-400 text-xs ml-4">Service has built-in user accounts and session management.</span>';
-                    } else if (service.auth_type === 'nextcloud') {
+                    } else if (service.auth_type === 'nextcloud' || service.auth_type === 'mattermost-creds') {
                         html += '<span class="text-blue-300">Service-Native (Manual Login)</span><br>';
                         html += '<span class="text-gray-400 text-xs ml-4">Homepage displays credentials, friend logs in manually.</span>';
                     } else {
