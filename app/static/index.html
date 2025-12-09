@@ -1856,13 +1856,18 @@
                         }
                     }
 
+                    // Admin always sees arrow for credential-display services (they manage their own sessions)
+                    const isAdmin = (this.view === 'admin' || this.view === 'admin-services');
+
                     // Has basic auth we can't bypass = pencil (credentials in modal)
-                    if (healthStatus.health === 'auth_required' && this.needsManualLogin(service)) {
+                    // BUT admins see arrow since they click through directly
+                    if (healthStatus.health === 'auth_required' && this.needsManualLogin(service) && !isAdmin) {
                         return { icon: '✏️', color: 'yellow-400', title: 'credentials in modal' };
                     }
 
                     // Manual login without health check info
-                    if (this.needsManualLogin(service)) {
+                    // BUT admins see arrow since they click through directly
+                    if (this.needsManualLogin(service) && !isAdmin) {
                         return { icon: '✏️', color: 'yellow-400', title: 'manual login required' };
                     }
 
@@ -1881,11 +1886,16 @@
 
                 async handleServiceClick(service) {
                     console.log('handleServiceClick:', service.name, 'auth_type:', service.auth_type, 'needsManualLogin:', this.needsManualLogin(service));
+
+                    // Admin can always click through directly (they manage their own sessions)
+                    const isAdmin = (this.view === 'admin' || this.view === 'admin-services');
+
                     // For services requiring manual login with stored credentials, show modal
-                    if (this.needsManualLogin(service)) {
+                    // BUT: admins skip the credentials modal and go directly to the service
+                    if (this.needsManualLogin(service) && !isAdmin) {
                         await this.showCredentialsModal(service);
                     } else {
-                        // For auto-auth or external services, just navigate
+                        // For auto-auth, external services, or admin access, just navigate
                         window.open(this.getServiceUrl(service), '_blank');
                     }
                 },
