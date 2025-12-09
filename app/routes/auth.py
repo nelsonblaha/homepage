@@ -270,8 +270,8 @@ async def _auth_mattermost_creds(friend: dict, subdomain: str) -> Response:
     if not friend.get("mattermost_user_id") or not friend.get("mattermost_password"):
         raise HTTPException(status_code=403, detail="No Mattermost account configured")
 
-    # Email format matches what we create in mattermost.py
-    email = f"{friend['name'].lower().replace(' ', '')}@{BASE_DOMAIN}"
+    # Username is the friend's name in lowercase without spaces
+    username = friend['name'].lower().replace(' ', '')
 
     # Display credentials page
     html = f"""
@@ -371,9 +371,9 @@ async def _auth_mattermost_creds(friend: dict, subdomain: str) -> Response:
             <div class="subtitle">Hi {friend['name']}! Use these credentials to log in:</div>
 
             <div class="credential">
-                <label>Email</label>
-                <div class="value" id="email">{email}</div>
-                <button class="copy-btn" onclick="copy('email')">Copy Email</button>
+                <label>Username</label>
+                <div class="value" id="username">{username}</div>
+                <button class="copy-btn" onclick="copy('username')">Copy Username</button>
             </div>
 
             <div class="credential">
@@ -386,7 +386,7 @@ async def _auth_mattermost_creds(friend: dict, subdomain: str) -> Response:
 
             <div class="instructions">
                 <strong>Instructions:</strong><br>
-                1. Copy your email and password<br>
+                1. Copy your username and password<br>
                 2. Click "Continue to Mattermost"<br>
                 3. Paste your credentials into the login form
             </div>
