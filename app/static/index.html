@@ -1857,18 +1857,21 @@
                         }
                     }
 
-                    // Admin always sees arrow for credential-display services (they manage their own sessions)
+                    // Admin usually sees arrow for credential-display services (they manage their own sessions)
+                    // Exception: sonarr-creds shows pencil even for admin (two-step auth required)
                     const isAdmin = (this.view === 'admin' || this.view === 'admin-services');
+                    const authType = service.auth_type || '';
+                    const adminNeedsModal = (authType === 'sonarr-creds');
 
                     // Has basic auth we can't bypass = pencil (credentials in modal)
-                    // BUT admins see arrow since they click through directly
-                    if (healthStatus.health === 'auth_required' && this.needsManualLogin(service) && !isAdmin) {
+                    // Exception: sonarr-creds shows pencil even for admin
+                    if (healthStatus.health === 'auth_required' && this.needsManualLogin(service) && (!isAdmin || adminNeedsModal)) {
                         return { icon: '✏️', color: 'yellow-400', title: 'credentials in modal' };
                     }
 
                     // Manual login without health check info
-                    // BUT admins see arrow since they click through directly
-                    if (this.needsManualLogin(service) && !isAdmin) {
+                    // Exception: sonarr-creds shows pencil even for admin
+                    if (this.needsManualLogin(service) && (!isAdmin || adminNeedsModal)) {
                         return { icon: '✏️', color: 'yellow-400', title: 'manual login required' };
                     }
 
@@ -1892,8 +1895,12 @@
                     const isAdmin = (this.view === 'admin' || this.view === 'admin-services');
 
                     // For services requiring manual login with stored credentials, show modal
-                    // BUT: admins skip the credentials modal and go directly to the service
-                    if (this.needsManualLogin(service) && !isAdmin) {
+                    // Exception: sonarr-creds shows modal even for admin (two-step auth required)
+                    // Other credential services: admins skip the modal and go directly
+                    const authType = service.auth_type || '';
+                    const adminNeedsModal = (authType === 'sonarr-creds');
+
+                    if (this.needsManualLogin(service) && (!isAdmin || adminNeedsModal)) {
                         await this.showCredentialsModal(service);
                     } else {
                         // For auto-auth, external services, or admin access, just navigate
