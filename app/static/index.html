@@ -1820,15 +1820,16 @@
                     // Services where we have stored credentials but user must enter them manually
                     // Nextcloud: shows credentials modal for copy/paste
                     // Mattermost-creds: shows credentials modal for Mattermost login
+                    // Sonarr-creds: shows credentials modal for both basic auth and Sonarr app login
                     // Basic auth: shows credentials modal for browser basic auth
                     const authType = service.auth_type || '';
-                    return authType === 'nextcloud' || authType === 'mattermost-creds' || authType === 'basic';
+                    return authType === 'nextcloud' || authType === 'mattermost-creds' || authType === 'sonarr-creds' || authType === 'basic';
                 },
 
                 hasKnownAuthType(service) {
                     // Check if service has a known auth type (for showing/hiding icons)
                     const authType = service.auth_type || '';
-                    const knownTypes = ['jellyfin', 'ombi', 'overseerr', 'forward-auth', 'open', 'nextcloud', 'mattermost-creds', 'basic', 'plex'];
+                    const knownTypes = ['jellyfin', 'ombi', 'overseerr', 'forward-auth', 'open', 'nextcloud', 'mattermost-creds', 'sonarr-creds', 'basic', 'plex'];
                     return knownTypes.includes(authType);
                 },
 

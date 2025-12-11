@@ -412,6 +412,216 @@ async def _auth_mattermost_creds(friend: dict, subdomain: str) -> Response:
     return HTMLResponse(content=html)
 
 
+async def _auth_sonarr_creds(friend: dict, subdomain: str) -> Response:
+    """Display Sonarr credentials for manual login.
+
+    Sonarr requires TWO sets of credentials:
+    1. HTTP Basic Auth (nginx level) - shown first
+    2. Sonarr Application Login - shown second
+
+    Both use the same username/password for simplicity.
+    """
+    # Admin uses the shared admin credentials
+    is_admin = (friend.get("id") == 0 or friend.get("token") == "admin")
+
+    if is_admin:
+        username = BASIC_AUTH_USER
+        password = BASIC_AUTH_PASS
+    else:
+        if not friend.get("sonarr_basic_user") or not friend.get("sonarr_basic_pass"):
+            raise HTTPException(status_code=403, detail="No Sonarr credentials configured")
+        # Same credentials used for both basic auth and Sonarr app
+        username = friend['sonarr_basic_user']
+        password = friend['sonarr_basic_pass']
+
+    # Display credentials page with both sets
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Sonarr Login - {friend['name']}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            }}
+            .container {{
+                background: white;
+                padding: 2rem;
+                border-radius: 12px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                max-width: 500px;
+                width: 90%;
+            }}
+            h1 {{
+                margin: 0 0 0.5rem 0;
+                color: #333;
+                font-size: 1.5rem;
+            }}
+            .subtitle {{
+                color: #666;
+                margin-bottom: 1.5rem;
+                font-size: 0.9rem;
+            }}
+            .auth-section {{
+                background: #f9fafb;
+                padding: 1rem;
+                border-radius: 8px;
+                margin: 1rem 0;
+                border-left: 4px solid #667eea;
+            }}
+            .auth-section h2 {{
+                margin: 0 0 0.75rem 0;
+                font-size: 1.1rem;
+                color: #667eea;
+            }}
+            .auth-section p {{
+                margin: 0 0 0.75rem 0;
+                font-size: 0.85rem;
+                color: #666;
+            }}
+            .credential {{
+                margin: 0.75rem 0;
+            }}
+            label {{
+                display: block;
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+                color: #555;
+                font-size: 0.9rem;
+            }}
+            .value {{
+                background: #fff;
+                padding: 0.75rem;
+                border-radius: 6px;
+                font-family: 'Courier New', monospace;
+                word-break: break-all;
+                border: 1px solid #e5e7eb;
+            }}
+            .copy-btn {{
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 0.85rem;
+                margin-top: 0.5rem;
+                width: 100%;
+                font-weight: 600;
+            }}
+            .copy-btn:hover {{
+                background: #5568d3;
+            }}
+            .continue-btn {{
+                background: #10b981;
+                color: white;
+                text-decoration: none;
+                display: block;
+                text-align: center;
+                padding: 0.75rem;
+                border-radius: 6px;
+                margin-top: 1.5rem;
+                font-weight: 600;
+            }}
+            .continue-btn:hover {{
+                background: #059669;
+            }}
+            .instructions {{
+                background: #fef3c7;
+                padding: 1rem;
+                border-radius: 6px;
+                margin-top: 1.5rem;
+                font-size: 0.85rem;
+                color: #92400e;
+            }}
+            .instructions ol {{
+                margin: 0.5rem 0 0 0;
+                padding-left: 1.5rem;
+            }}
+            .instructions li {{
+                margin: 0.25rem 0;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Sonarr Access</h1>
+            <div class="subtitle">Hi {friend['name']}! Sonarr needs two logins. Use the same credentials for both:</div>
+
+            <div class="auth-section">
+                <h2>Step 1: Browser Login (HTTP Basic Auth)</h2>
+                <p>Your browser will prompt for these credentials first:</p>
+
+                <div class="credential">
+                    <label>Username</label>
+                    <div class="value" id="basic-username">{username}</div>
+                    <button class="copy-btn" onclick="copy('basic-username')">Copy Username</button>
+                </div>
+
+                <div class="credential">
+                    <label>Password</label>
+                    <div class="value" id="basic-password">{password}</div>
+                    <button class="copy-btn" onclick="copy('basic-password')">Copy Password</button>
+                </div>
+            </div>
+
+            <div class="auth-section">
+                <h2>Step 2: Sonarr Application Login</h2>
+                <p>After the browser login, Sonarr will ask you to log in again. Use the SAME credentials:</p>
+
+                <div class="credential">
+                    <label>Username</label>
+                    <div class="value" id="app-username">{username}</div>
+                    <button class="copy-btn" onclick="copy('app-username')">Copy Username</button>
+                </div>
+
+                <div class="credential">
+                    <label>Password</label>
+                    <div class="value" id="app-password">{password}</div>
+                    <button class="copy-btn" onclick="copy('app-password')">Copy Password</button>
+                </div>
+            </div>
+
+            <a href="https://{subdomain}.{BASE_DOMAIN}/" class="continue-btn">Continue to Sonarr →</a>
+
+            <div class="instructions">
+                <strong>Login Steps:</strong>
+                <ol>
+                    <li>Copy the username and password above</li>
+                    <li>Click "Continue to Sonarr"</li>
+                    <li>Enter credentials when your browser prompts (popup dialog)</li>
+                    <li>Enter the SAME credentials again on the Sonarr login page</li>
+                </ol>
+            </div>
+        </div>
+        <script>
+            function copy(id) {{
+                const text = document.getElementById(id).textContent;
+                navigator.clipboard.writeText(text).then(() => {{
+                    const btn = event.target;
+                    const original = btn.textContent;
+                    btn.textContent = '✓ Copied!';
+                    btn.style.background = '#10b981';
+                    setTimeout(() => {{
+                        btn.textContent = original;
+                        btn.style.background = '#667eea';
+                    }}, 2000);
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
+
 async def _auth_nextcloud(friend: dict, subdomain: str) -> Response:
     """Display Nextcloud credentials for manual login.
 
@@ -995,6 +1205,8 @@ async def unified_auth_redirect(subdomain: str, admin_token: Optional[str] = Coo
             return await _auth_nextcloud(friend, subdomain)
         elif auth_type == "mattermost-creds":
             return await _auth_mattermost_creds(friend, subdomain)
+        elif auth_type == "sonarr-creds":
+            return await _auth_sonarr_creds(friend, subdomain)
         elif auth_type == "none" or auth_type == "forward-auth":
             # Services with no custom auth - just redirect
             return RedirectResponse(url=f"https://{subdomain}.{BASE_DOMAIN}/", status_code=302)
