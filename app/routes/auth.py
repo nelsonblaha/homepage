@@ -1230,14 +1230,14 @@ async def get_admin_credentials(subdomain: str, _: bool = Depends(verify_admin))
 
         auth_type = service.get("auth_type", "none")
 
-        if auth_type == "basic":
-            # Return HTTP basic auth credentials
+        if auth_type == "basic" or auth_type == "sonarr-creds":
+            # Return HTTP basic auth credentials (same for both basic and sonarr-creds)
             return {
                 "username": BASIC_AUTH_USER,
                 "password": BASIC_AUTH_PASS
             }
         else:
-            raise HTTPException(status_code=400, detail="Service does not use basic auth")
+            raise HTTPException(status_code=400, detail="Service does not use credential display")
 
 
 # Legacy endpoint for backwards compatibility
